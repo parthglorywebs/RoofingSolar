@@ -84,6 +84,7 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        vectorDrawables.useSupportLibrary = true 
     }
     signingConfigs {
         debug {
@@ -105,12 +106,20 @@ android {
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
     }
+    sourceSets {
+        main {
+            assets.srcDirs = ['src/assets', 'src/assets/fonts'] 
+        }
+    }
 }
+apply from: file("../../node_modules/react-native-vector-icons/fonts.gradle") 
 
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
-
+    implementation project(':react-native-vector-icons')
+    implementation project(':react-native-file-viewer')
+    implementation 'androidx.appcompat:appcompat:1.6.1' 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
     } else {

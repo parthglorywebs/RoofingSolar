@@ -2,6 +2,28 @@
 #
 .DS_Store
 
+# Node.js
+#
+node_modules/
+
+# Android/Gradle
+#
+android/.gradle/
+android/app/build/
+
+# iOS
+#
+ios/Pods/
+ios/build/
+
+# VS Code settings
+#
+.vscode/
+
+# Environment files
+#
+.env
+
 # Xcode
 #
 build/
@@ -19,12 +41,12 @@ xcuserdata
 DerivedData
 *.hmap
 *.ipa
+*.xcarchive
 *.xcuserstate
 **/.xcode.env.local
 
 # Android/IntelliJ
 #
-build/
 .idea
 .gradle
 local.properties
@@ -34,19 +56,8 @@ local.properties
 *.keystore
 !debug.keystore
 
-# node.js
-#
-node_modules/
-npm-debug.log
-yarn-error.log
-
 # fastlane
 #
-# It is recommended to not store the screenshots in the git repo. Instead, use fastlane to re-generate the
-# screenshots whenever they are needed.
-# For more information about the recommended setup visit:
-# https://docs.fastlane.tools/best-practices/source-control/
-
 **/fastlane/report.xml
 **/fastlane/Preview.html
 **/fastlane/screenshots

@@ -12,7 +12,7 @@ import {
   TouchableWithoutFeedback,
   ActivityIndicator,
   TextInput,
-  ScrollView, // Import ScrollView
+  ScrollView, // Remove ScrollView import
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import {launchImageLibrary} from 'react-native-image-picker';
@@ -25,6 +25,7 @@ import {getLoginDetails} from '../../utils/AsyncStorage';
 import Colors from '../../assets/styling/colors';
 import {Calendar} from 'react-native-calendars';
 import ImageViewer from 'react-native-image-zoom-viewer';
+import FastImage from 'react-native-fast-image'
 //import { format } from 'date-fns'; // Removed this line
 
 const {width, height} = Dimensions.get('window');
@@ -80,8 +81,6 @@ const PhotosVideoScreen = ({selectedJob}) => {
 
         if (fromDate && toDate) {
           apiUrl = `${config.baseUrl}contractor/date-filter-photos-videos`;
-          // console.log( moment(fromDate).format('MM/DD/YYYY'),  moment(fromDate).format('MM/DD/YYYY'));
-          
           postData = {
             contractor_id: contractor_id,
             project_id: selectedJob.id,
@@ -105,7 +104,16 @@ const PhotosVideoScreen = ({selectedJob}) => {
         });
 
         if (response.status !== 200) {
-          throw new Error('Request failed with status ' + response.status);
+          // Check for 422 status specifically
+          if (response.status === 422) {
+             setGroupedMedia({}); // Clear any existing data
+             console.log('No Photos and videos found for the selected date range');
+             // Optionally, show a user-friendly message (not an Alert, just a text in the UI)
+             return; // Exit the function early
+          } else {
+            throw new Error('Request failed with status ' + response.status); //Handle other errors
+          }
+
         }
 
         const data = response.data;
@@ -297,13 +305,25 @@ const PhotosVideoScreen = ({selectedJob}) => {
           }}>
           <>
             {item.type && item.type.toLowerCase().includes('image') ? (
-              <Image
-                source={{uri: item.uri}}
+              // <Image
+              //   source={{uri: item.uri}}
+              //   style={{
+              //     ...styles.image,
+              //     width: width * 0.3,
+              //     height: width * 0.3,
+              //   }}
+              // />
+              <FastImage // Use FastImage here
+                source={{
+                  uri: item.uri, // Use thumbnail if available
+                  priority: FastImage.priority.high, // Or 'high', 'low'
+                }}
                 style={{
                   ...styles.image,
                   width: width * 0.3,
                   height: width * 0.3,
                 }}
+                resizeMode={FastImage.resizeMode.cover} // Or 'contain', 'stretch', etc.
               />
             ) : item.type && item.type.toLowerCase().includes('video') ? (
               <View style={{position: 'relative'}}>
@@ -406,7 +426,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
 
   const handleRangeSelect = range => {
     // console.log(selectedRange);
-    
+
     let startDate, endDate;
 
     switch (range) {
@@ -467,6 +487,19 @@ const PhotosVideoScreen = ({selectedJob}) => {
       setFilterIcon('filter');
     }
   };
+
+  const handleResetFilter = () => {
+    setMenuVisible(false);
+    setSelectedRange(null);
+    setCustomStartDate(null);
+    setCustomEndDate(null);
+    setTempStartDate(null);
+    setTempEndDate(null);
+    setFilterText('Filter');
+    setFilterIcon('filter');
+    fetchPhotoVideos(); // Fetch all data without date filter
+  };
+
 
   const handleScroll = useCallback(
     event => {
@@ -643,8 +676,8 @@ const PhotosVideoScreen = ({selectedJob}) => {
     return {};
   };
 
-  return (
-    <View style={styles.container}>
+  const renderHeader = () => (
+    <View>
       <Menu
         style={styles.menuStyle}
         visible={menuVisible}
@@ -686,10 +719,12 @@ const PhotosVideoScreen = ({selectedJob}) => {
           title="Custom Range"
         />
         <Divider />
-        <Menu.Item onPress={handleFilterToggle} title="Cancel" />
-        
+        <Menu.Item onPress={handleResetFilter} title="Cancel" />
       </Menu>
-
+    </View>
+  );
+  return (
+    <View style={styles.container}>
       {apiLoading ? (
         <ActivityIndicator
           size="large"
@@ -701,7 +736,12 @@ const PhotosVideoScreen = ({selectedJob}) => {
           <Text style={styles.emptyTextCenter}>No Photos or Videos found.</Text>
         </View>
       ) : (
-        Object.entries(groupedMedia).map(renderDateSection)
+        <FlatList
+          data={Object.entries(groupedMedia)}
+          keyExtractor={(item, index) => index.toString()}
+          renderItem={({item}) => renderDateSection(item)}
+          ListHeaderComponent={renderHeader}
+        />
       )}
 
       <View style={styles.topRightContainer}>
@@ -733,6 +773,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
         <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
           <View style={styles.modalOverlay}>
             <View style={styles.modalContainer}>
+              {/*<ScrollView>  Remove ScrollView Here */}
               <ScrollView>
                 {modalMediaLoading && (
                   <ActivityIndicator
@@ -749,25 +790,38 @@ const PhotosVideoScreen = ({selectedJob}) => {
                     //   style={styles.modalImage}
                     //   onLoad={handleModalLoad}
                     // />
-                    <ImageViewer
-                      imageUrls={[
-                        {url: selectedMedia.uri, width: width, height: 400},
-                      ]}
-                      enableSwipeDown={true}
-                      onSwipeDown={() => setModalVisible(false)}
-                      
+                    // <ImageViewer
+                    //   imageUrls={[
+                    //     {url: selectedMedia.uri, width: width, height: 400},
+                    //   ]}
+                    //   enableSwipeDown={true}
+                    //   onSwipeDown={() => setModalVisible(false)}
+                    //   style={{width: '100%', height: 400}}
+                    //   renderIndicator={() => null}
+                    //   renderHeader={() => (
+                    //     <View style={{height: 0, width: 0}} />
+                    //   )}
+                    //   backgroundColor="transparent"
+                    //   loadingRender={() => (
+                    //     <View style={styles.loadingContainer}>
+                    //       <ActivityIndicator size="large" color="#007bff" />
+                    //     </View>
+                    //   )}
+                    // />
+                    <FastImage // Use FastImage here
+                    source={{
+                      uri: selectedMedia.uri, // Use thumbnail if available
+                      priority: FastImage.priority.high, // Or 'high', 'low'
+                    }}
                       style={{width: '100%', height: 400}}
                       renderIndicator={() => null}
-                      renderHeader={() => (
-                        <View style={{ height: 0, width: 0 }}/> 
-                      )}
-                      backgroundColor="transparent" 
-                      loadingRender={() => (
+                    resizeMode={FastImage.resizeMode.cover} // Or 'contain', 'stretch', etc.
+                       loadingRender={() => (
                         <View style={styles.loadingContainer}>
                           <ActivityIndicator size="large" color="#007bff" />
                         </View>
                       )}
-                    />
+                  />
                   )}
 
                 {selectedMedia &&
@@ -804,6 +858,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
                   )}
                 </TouchableOpacity>
               </ScrollView>
+              {/* </ScrollView> */}
               <TouchableOpacity
                 style={styles.closeModalButton}
                 onPress={() => {
@@ -884,8 +939,8 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     height: 120,
     position: 'relative',
-    marginBottom: 10,
-    marginRight: 8,
+    marginBottom: 5,
+    marginRight: 5,
   },
   image: {
     borderRadius: 5,
@@ -921,15 +976,15 @@ const styles = StyleSheet.create({
   },
   closeIcon: {
     position: 'absolute',
-    top: -10,
-    right: -5,
+    top: -5,
+    right: -1,
     backgroundColor: 'red',
-    width: 30,
-    height: 30,
+    width: 22,
+    height: 22,
     borderRadius: 15,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 5,
+    padding: 1,
   },
   closeText: {
     color: 'white',

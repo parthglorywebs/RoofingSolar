@@ -17,6 +17,7 @@ import Colors from '../../../assets/styling/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Collapsible from 'react-native-collapsible';
 import {Calendar} from 'react-native-calendars'; // Import Calendar
+import {Menu, Provider, Divider} from 'react-native-paper';
 
 if (Platform.OS === 'android') {
   if (UIManager.setLayoutAnimationEnabledExperimental) {
@@ -51,7 +52,8 @@ const InvoicesList = ({data, loading, error}) => {
     useState(false);
   const [isDueDatePickerVisible, setIsDueDatePickerVisible] = useState(false);
   const [itemSubtotals, setItemSubtotals] = useState({}); 
-
+  const [selectedInvoiceIdForAction, setSelectedInvoiceIdForAction] = useState(null);
+  const [isActionModalVisible, setIsActionModalVisible] = useState(false);
   // LayoutAnimation configuration
   const animationConfig = {
     duration: 300,
@@ -130,6 +132,57 @@ const InvoicesList = ({data, loading, error}) => {
       {cancelable: false},
     );
   }, []);
+
+  const handleOpenActionModal = (invoiceId) => {
+    setSelectedInvoiceIdForAction(invoiceId);
+    setIsActionModalVisible(true);
+  };
+
+  const handleCloseActionModal = () => {
+    setIsActionModalVisible(false);
+    setSelectedInvoiceIdForAction(null);
+  };
+
+  const handleActionSelect = (action) => {
+    handleCloseActionModal();
+
+    switch (action) {
+      case 'addWorksheet':
+        // Handle add worksheet action
+        console.log('Add Worksheet action');
+        break;
+      case 'removeInvoice':
+        // Show confirmation alert for removing the invoice
+        Alert.alert(
+          'Delete Invoice Item',
+          'Are you sure you want to delete this Invoice item?',
+          [
+            {text: 'Cancel', style: 'cancel'},
+            {
+              text: 'Delete',
+              style: 'destructive',
+              onPress: () => {
+                setSelectedInvoices(prevInvoices =>
+                  prevInvoices.filter(invoice => invoice.id !== selectedInvoiceIdForAction),
+                );
+              },
+            },
+          ],
+          {cancelable: false},
+        );
+        break;
+      case 'importFinancialData':
+        // Handle import financial data action
+        console.log('Import Financial Data action');
+        break;
+      case 'importQuotation':
+        // Handle import quotation action
+        console.log('Import Quotation action');
+        break;
+      default:
+        break;
+    }
+  };
 
   const toggleCollapse = itemId => {
     LayoutAnimation.configureNext(animationConfig);
@@ -363,7 +416,7 @@ const InvoicesList = ({data, loading, error}) => {
                     </View>
                     <TouchableOpacity
                       style={styles.deleteButton}
-                      onPress={() => handleDeleteInvoice(item.id)}>
+                      onPress={() => handleOpenActionModal(item.id)}>
                       <Icon
                         name="dots-vertical"
                         size={30}

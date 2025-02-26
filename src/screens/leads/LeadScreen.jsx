@@ -14,6 +14,8 @@ import {
   Dimensions,
   TouchableWithoutFeedback,
   ActivityIndicator,
+  Platform, 
+  Linking
 } from 'react-native';
 import {useColorScheme} from 'react-native';
 import Colors from '../../assets/styling/colors';
@@ -92,6 +94,8 @@ const LeadScreen = ({route}) => {
 
       const requestData = {
         contractor_id: contractor_id,
+        stage: '',
+        page: 1
       };
       if (stage) {
         requestData.stage = stage;
@@ -111,14 +115,16 @@ const LeadScreen = ({route}) => {
         response &&
         response.data &&
         response.data.success &&
-        response.data.data
+        response.data.data &&
+        response.data.data.data
       ) {
-        const data = response.data.data || [];
-        setProjectListData(data);
+        setProjectListData(response.data.data.data);
       } else {
         console.error('No Data found for Project List.');
         setErrorList('No data received');
+        setProjectListData([]); // Clear the project list
       }
+
 
       setLoading(false);
     } catch (error) {
@@ -298,7 +304,7 @@ const LeadScreen = ({route}) => {
     [selectedChip, handlePropertyPress],
   );
 
-  const getCircleColors = useCallback(
+  const getCircleColors = useCallback(  
     currentStage => {
       switch (currentStage) {
         case 'lead':
@@ -441,8 +447,8 @@ const LeadScreen = ({route}) => {
                   <View
                     style={{
                       flexDirection: 'row',
-                      alignItems: 'center',
-                      flex: 1,
+                      // alignItems: 'center',
+                      flex: 1.5,
                       
                     }}>
                     <Text
@@ -504,6 +510,102 @@ const LeadScreen = ({route}) => {
       }),
     [filteredProjects, getCircleInfo, itemData, openModal],
   );
+
+  const handleCallPress = useCallback(async phoneNumber => {
+    if (!selectedJob) {
+      Alert.alert('Error', 'No contact selected');
+      return;
+    }
+    let cleanedPhoneNumber = encodeURIComponent(
+      phoneNumber.replace(/[^0-9+]/g, ''),
+    );
+    const countryCode =
+      countries.find(item => item.code === selectedJob?.country_code)
+        ?.dial_code || '+1';
+    cleanedPhoneNumber = countryCode + cleanedPhoneNumber;
+
+    let url;
+    if (Platform.OS === 'ios') {
+      url = `facetime:${cleanedPhoneNumber}`; 
+    } else {
+      url = `tel:${cleanedPhoneNumber}`; 
+    }
+
+    try {
+      const supported = await Linking.canOpenURL(url);
+
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        if (Platform.OS === 'ios') {
+          Alert.alert(
+            'FaceTime not available',
+            'Falling back to a regular phone call.',
+          );
+        }
+        const telUrl =
+          Platform.OS === 'android'
+            ? `tel:${cleanedPhoneNumber}`
+            : `telprompt:${cleanedPhoneNumber}`;
+        const callSupported = await Linking.canOpenURL(telUrl);
+        if (callSupported) {
+          await Linking.openURL(telUrl);
+        } else {
+          Alert.alert(`Error to open: ${telUrl}`);
+        }
+      }
+    } catch (error) {
+      console.error('An error occurred', error);
+      Alert.alert('Call Failed', `Unable to open: ${error.message}`);
+    }
+  }, [selectedJob]);
+
+
+  const handleEmail = useCallback(async email => {
+    if (!selectedJob) {
+      Alert.alert("Error", "No contact selected");
+      return;
+    }
+    const url = `mailto:${email}`;
+    try {
+      // const supported = await Linking.canOpenURL(url);
+      // if (supported) {
+      //   await Linking.openURL(url);
+      // } else {
+      //   Alert.alert(`Error to open : ${url}`);
+      // }
+      Linking.openURL('https://mail.google.com/mail/u/0/#inbox?compose=new');
+
+    } catch (error) {
+      console.error("An error occurred", error);
+      Alert.alert("Email Failed", `Unable to open the email app: ${error.message}`);
+    }
+  }, [selectedJob]);
+
+  const handleMap = useCallback(async address => {
+    if (!selectedJob) {
+      Alert.alert("Error", "No contact selected");
+      return;
+    }
+    const encodedAddress = encodeURIComponent(address);
+    const url = Platform.select({
+      ios: `maps://?q=${encodedAddress}`,
+      android: `geo:0,0?q=${encodedAddress}`,
+    });
+
+    try {
+      const supported = await Linking.canOpenURL(url);
+
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        Alert.alert(`Don't know how to open this URL: ${url}`);
+      }
+    } catch (error) {
+      console.error("An error occurred", error);
+      Alert.alert("Map Failed", `Unable to open the map app: ${error.message}`);
+    }
+  }, [selectedJob]);
 
   const renderContent = useMemo(() => {
     if (loading) {
@@ -595,6 +697,8 @@ const LeadScreen = ({route}) => {
                         {selectedJob?.title}
                       </Text>
                       <View style={styles.modalDetail}>
+                      <TouchableOpacity onPress={() => handleCallPress(selectedJob.phone)}>
+
                         <View style={styles.callDetail}>
                           <MaterialCommunityIcons
                             name="phone"
@@ -608,7 +712,11 @@ const LeadScreen = ({route}) => {
                             {selectedJob.phone}
                           </Text>
                         </View>
+                        </TouchableOpacity>
+
                         <View style={styles.divider} />
+                        <TouchableOpacity onPress={() => handleEmail(selectedJob.customer_email)}>
+
                         <View style={styles.callDetail}>
                           <MaterialCommunityIcons
                             name="email"
@@ -619,7 +727,11 @@ const LeadScreen = ({route}) => {
                             {selectedJob.customer_email}
                           </Text>
                         </View>
+                        </TouchableOpacity>
+
                         <View style={styles.divider} />
+                        <TouchableOpacity onPress={() => handleMap(selectedJob.address)}>
+
                         <View style={styles.callDetail}>
                           <MaterialCommunityIcons
                             name="map-marker"
@@ -630,7 +742,10 @@ const LeadScreen = ({route}) => {
                             {selectedJob.address ? selectedJob.address : '---'}
                           </Text>
                         </View>
+                        </TouchableOpacity>
+
                         <View style={styles.divider} />
+
                         <View style={styles.callDetail}>
                           <MaterialCommunityIcons
                             name="account"
@@ -642,6 +757,7 @@ const LeadScreen = ({route}) => {
                             {selectedJob.customer_name}
                           </Text>
                         </View>
+
                         <View style={styles.divider} />
                         <View style={styles.callDetail}>
                           <MaterialCommunityIcons
@@ -888,6 +1004,9 @@ const LeadScreen = ({route}) => {
     handleResetFilter,
     selectedFilterStage,
     renderProjectList,
+    handleCallPress,
+    handleEmail,
+    handleMap,
   ]);
 
   return (

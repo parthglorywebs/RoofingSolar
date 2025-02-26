@@ -99,7 +99,7 @@ const PropertyInfo = () => {
           },
         },
       );
-      console.log(contractor_id, initialSelectedJob.id);
+      // console.log(contractor_id, initialSelectedJob.id);
 
       const data = response.data;
       if (data && data.data) {

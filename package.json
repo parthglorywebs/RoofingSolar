@@ -52,7 +52,8 @@
     "react-native-video": "^6.9.0",
     "react-native-video-controls": "^2.8.1",
     "react-native-webview": "^13.12.5",
-    "react-redux": "^9.2.0"
+    "react-redux": "^9.2.0",
+    "rn-fetch-blob": "^0.12.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

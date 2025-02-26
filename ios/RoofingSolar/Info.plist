@@ -76,7 +76,12 @@
     <array>
         <string>tel</string>
         <string>telprompt</string>
+        <string>mailto</string>
+        <string>facetime</string>
+        <string>facetime-audio</string>
     </array>
+    
+    
 
     <key>NSPhotoLibraryUsageDescription</key>
     <string>Allow access to your photo library to select a profile image.</string>

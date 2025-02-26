@@ -72,52 +72,22 @@ const DocumentList = ({
       setModalLoading(false);
       setPreviewingDocumentId(null);
     } else {
-      const fileUrl = `${config.profileImage}${document.file}`;
+      const fileUrl = `${config.profileImage}storage/${document.file}`;
       const fileName = extractFilename(document.file) || 'unknown_file'; // Use helper function
       const localFilePath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
-
-      // console.log('File URL:', fileUrl);
-      // console.log('Local File Path:', localFilePath);
+      console.log("fileUrl: ", fileUrl)
+      console.log("fileName: ", fileName)
+      console.log("localFilePath: ", localFilePath)
 
       try {
         const fileExists = await RNFS.exists(localFilePath);
-        // console.log('File Exists:', fileExists);
+        console.log("fileExists: ", fileExists)
 
         if (fileExists) {
-          // console.log('Opening existing file:', localFilePath);
-          try {
-              const mimeType = getMimeType(document.type);
-              if (Platform.OS === 'android') {
-
-                await FileViewer.open(localFilePath, {
-                  showOpenWithDialog: true,
-                  mimeType: mimeType, // Specify MIME type
-                });
-              } else {
-                await FileViewer.open(localFilePath, { showOpenWithDialog: true });
-              }
-            setModalLoading(false);
-          } catch (fileViewerError) {
-            console.error('FileViewer error:', fileViewerError);
-            Alert.alert(
-              'Error',
-              `Could not open file: ${fileViewerError.message}`,
-            );
-            setModalLoading(false);
-          }
-        } else {
-          // console.log('Downloading file from:', fileUrl, 'to', localFilePath);
-          const res = await RNFS.downloadFile({
-            fromUrl: fileUrl,
-            toFile: localFilePath,
-          }).promise;
-
-          // console.log('Download Status Code:', res.statusCode);
-
-          if (res.statusCode === 200) {
-            // console.log('Opening downloaded file:', localFilePath);
+            console.log('Opening existing file:', localFilePath);
             try {
               const mimeType = getMimeType(document.type);
+              console.log("mimeType: ", mimeType)
               if (Platform.OS === 'android') {
 
                 await FileViewer.open(localFilePath, {
@@ -127,7 +97,7 @@ const DocumentList = ({
               } else {
                 await FileViewer.open(localFilePath, { showOpenWithDialog: true });
               }
-              setModalLoading(false);
+                setModalLoading(false);
             } catch (fileViewerError) {
               console.error('FileViewer error:', fileViewerError);
               Alert.alert(
@@ -137,17 +107,49 @@ const DocumentList = ({
               setModalLoading(false);
             }
           } else {
-            Alert.alert('Error', 'Could not preview file.');
-            setModalLoading(false);
+            console.log('Downloading file from:', fileUrl, 'to', localFilePath);
+            const res = await RNFS.downloadFile({
+              fromUrl: fileUrl,
+              toFile: localFilePath,
+            }).promise;
+
+            console.log('Download Status Code:', res.statusCode);
+
+            if (res.statusCode === 200) {
+              console.log('Opening downloaded file:', localFilePath);
+              try {
+                const mimeType = getMimeType(document.type);
+                console.log("mimeType: ", mimeType)
+                if (Platform.OS === 'android') {
+
+                  await FileViewer.open(localFilePath, {
+                    showOpenWithDialog: true,
+                    mimeType: mimeType, // Specify MIME type
+                  });
+                } else {
+                  await FileViewer.open(localFilePath, { showOpenWithDialog: true });
+                }
+                  setModalLoading(false);
+              } catch (fileViewerError) {
+                console.error('FileViewer error:', fileViewerError);
+                Alert.alert(
+                  'Error',
+                  `Could not open file: ${fileViewerError.message}`,
+                );
+                setModalLoading(false);
+              }
+            } else {
+              Alert.alert('Error', 'Could not preview file.');
+              setModalLoading(false);
+            }
           }
+        } catch (error) {
+          console.error('File download error:', error);
+          Alert.alert('Error', 'Could not preview file.');
+          setModalLoading(false);
+        } finally {
+          setPreviewingDocumentId(null);
         }
-      } catch (error) {
-        console.error('File download error:', error);
-        Alert.alert('Error', 'Could not preview file.');
-        setModalLoading(false);
-      } finally {
-        setPreviewingDocumentId(null);
-      }
     }
   };
 
@@ -157,36 +159,41 @@ const DocumentList = ({
     setPreviewingDocumentId(null);
   };
 
-  const handleDownload = async document => {
-
-    const fileUrl = `${config.profileImage}${document.file}`;
-    const fileName = extractFilename(document.file) || 'unknown_file'; // Extract filename
-
-    if (!fileName) {
-        Alert.alert("Error", "Could not determine filename for download.");
-        return;
-    }
-
-    const localFilePath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
-
-    // console.log("Downloading from:", fileUrl);
-    // console.log("Saving to:", localFilePath);
+  const handleDownload = async (document) => {
+  
+    const fileUrl = `${config.profileImage}storage/${document.file}`;
+    const fileName = document.name || 'unknown_file'; // Use document name, or provide a fallback
+    const fileExtension = document.type ? `.${document.type}` : '.pdf';  // Ensure file extension is set, or default to .pdf
+    const localFilePath = `${config.profileImage}storage/${document.file}`;  // Construct full file path
+  
+    console.log("Downloading from:", fileUrl);
+    console.log("Saving to:", localFilePath);
+  
     try {
-      const res = await RNFS.downloadFile({ fromUrl: fileUrl, toFile: localFilePath }).promise();
-
+      const downloadResult = RNFS.downloadFile({
+        fromUrl: fileUrl,
+        toFile: localFilePath,
+        begin: (res) => {
+          console.log('download begin', res);
+        },
+        progress: (res) => {
+          let percentage = (res.bytesWritten / res.contentLength) * 100;
+          console.log(`Download progress: ${percentage.toFixed(2)}%`);
+        }
+      });
+  
+      const res = await downloadResult.promise; // Await the promise correctly
+  
       if (res.statusCode === 200) {
         Alert.alert("Download Complete", `File saved to ${localFilePath}`);
-
-        // Optionally open the directory (platform-specific)
+  
         if (Platform.OS === 'android') {
-          // On Android, you can't directly open the directory, but you can inform the user
-          Alert.alert("Download Complete", `File saved to ${localFilePath}.  You may need to use a file explorer to view the file.`);
+          Alert.alert("Download Complete", `File saved to ${localFilePath}. You may need to use a file explorer to view the file.`);
         } else if (Platform.OS === 'ios') {
-          // iOS - You can attempt to open the file, though might be better to just show path
-          Linking.openURL(`file://${localFilePath}`)
+          Linking.openURL(`${localFilePath}`)
             .catch(err => Alert.alert("Error Opening File", err.message));
         }
-
+  
       } else {
         Alert.alert("Download Failed", `Server returned status code ${res.statusCode}`);
       }
@@ -295,7 +302,7 @@ const DocumentList = ({
               )}
               <Image
                 source={{
-                  uri: `${config.profileImage}${selectedDocument.file}`,
+                  uri: `${config.profileImage}storage/${selectedDocument.file}`,
                 }}
                 style={styles.modalImage}
                 resizeMode="contain"

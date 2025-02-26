@@ -117,7 +117,7 @@ function DocumentsTabs({selectedJob}) {
         },
       );
       const data = response.data;
-      // console.log('Raw API Response:', data);
+      // console.log('Raw API document:', contractor_id, selectedJob.id);
 
       if (data && data.data && data.data.success !== false) {
         const formattedDocuments = data.data.file_listing.map(file => ({

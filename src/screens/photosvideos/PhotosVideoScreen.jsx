@@ -12,7 +12,7 @@ import {
   TouchableWithoutFeedback,
   ActivityIndicator,
   TextInput,
-  ScrollView, // Remove ScrollView import
+  ScrollView,
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import {launchImageLibrary} from 'react-native-image-picker';
@@ -26,7 +26,6 @@ import Colors from '../../assets/styling/colors';
 import {Calendar} from 'react-native-calendars';
 import ImageViewer from 'react-native-image-zoom-viewer';
 import FastImage from 'react-native-fast-image'
-//import { format } from 'date-fns'; // Removed this line
 
 const {width, height} = Dimensions.get('window');
 
@@ -58,6 +57,12 @@ const PhotosVideoScreen = ({selectedJob}) => {
   const [tempEndDate, setTempEndDate] = useState(null);
   const [showNotesIndicator, setShowNotesIndicator] = useState(false);
 
+  // Pagination states
+  const [page, setPage] = useState(1); // Current page number
+  const [totalPages, setTotalPages] = useState(1); // Total number of pages
+  const [isFetchingMore, setIsFetchingMore] = useState(false); // Loading state for pagination
+  const [initialLoad, setInitialLoad] = useState(true); // Track the initial data fetch
+
   useEffect(() => {
     fetchInitialData();
   }, [fetchInitialData]);
@@ -65,18 +70,26 @@ const PhotosVideoScreen = ({selectedJob}) => {
   const fetchInitialData = useCallback(async () => {
     const {contractor_id} = await getLoginDetails();
     setContractorId(contractor_id);
-    await fetchPhotoVideos();
+    await fetchPhotoVideos(1); // Fetch initial data with page 1
+    setInitialLoad(false); // Initial load is complete
   }, []);
 
   const fetchPhotoVideos = useCallback(
-    async (fromDate = null, toDate = null) => {
-      setApiLoading(true);
+    async (currentPage = 1, fromDate = null, toDate = null) => {
+      // Added currentPage parameter with default value
+      if (currentPage === 1) {
+        setApiLoading(true); // Only show full loader on initial load
+      } else {
+        setIsFetchingMore(true); // Show pagination loader
+      }
+
       try {
         const {access_token, contractor_id} = await getLoginDetails();
         let apiUrl = `${config.baseUrl}contractor/get-photos-videos`;
         let postData = {
           contractor_id: contractor_id,
           project_id: selectedJob.id,
+          page: currentPage, // Use the currentPage parameter
         };
 
         if (fromDate && toDate) {
@@ -86,6 +99,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
             project_id: selectedJob.id,
             fromdate: moment(fromDate).format('MM/DD/YYYY'),
             todate: moment(toDate).format('MM/DD/YYYY'),
+            page: currentPage, // Include page for date-filtered requests as well
           };
         }
 
@@ -126,7 +140,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
           setGroupedMedia({});
           // console.log('No Photos and videos found');
         } else if (data && data.data) {
-          const grouped = data.data.reduce((acc, dayData) => {
+           const grouped = data.data.data.reduce((acc, dayData) => {
             const dayItems = dayData.is_item.map(item => ({
               uri: `${config.profileImage}storage/project_images/${item.project_image}`,
               type: item.media_type,
@@ -143,7 +157,30 @@ const PhotosVideoScreen = ({selectedJob}) => {
             acc[dayData.is_date].push(...dayItems);
             return acc;
           }, {});
-          setGroupedMedia(grouped);
+
+          if (currentPage === 1) {
+            // Initial data load, replace existing data
+            setGroupedMedia(grouped);
+          } else {
+            // Append new data to existing data
+            setGroupedMedia(prevGroupedMedia => {
+                const newGroupedMedia = { ...prevGroupedMedia };
+                for (const date in grouped) {
+                  if (newGroupedMedia[date]) {
+                    // If date already exists, append the items
+                    newGroupedMedia[date] = [...newGroupedMedia[date], ...grouped[date]];
+                  } else {
+                    // If date doesn't exist, add the new date and items
+                    newGroupedMedia[date] = grouped[date];
+                  }
+                }
+              return newGroupedMedia;
+            });
+          }
+
+          setTotalPages(data.data.last_page); // Set total pages from response
+          setPage(currentPage); // Update current page state
+
         } else {
           console.error('Invalid data format received from API:', data);
           Alert.alert(
@@ -153,13 +190,20 @@ const PhotosVideoScreen = ({selectedJob}) => {
         }
       } catch (error) {
         console.error('Error fetching photos/videos:', error);
-        Alert.alert('Error', 'Failed to load photos and videos.');
+        // Alert.alert('Error', 'Failed to load photos and videos.');
       } finally {
         setApiLoading(false);
+        setIsFetchingMore(false); // End pagination loading
       }
     },
     [selectedJob],
   );
+
+  const handleLoadMore = () => {
+    if (!isFetchingMore && page < totalPages) {
+      fetchPhotoVideos(page + 1); // Load the next page
+    }
+  };
 
   const handleAddMedia = useCallback(async () => {
     launchImageLibrary(
@@ -204,7 +248,8 @@ const PhotosVideoScreen = ({selectedJob}) => {
           );
 
           if (uploadResponse.data.status === 200) {
-            await fetchPhotoVideos();
+            // After successful upload, refresh the data from the first page
+            await fetchPhotoVideos(1);
             Alert.alert('Success', 'Media uploaded successfully');
           } else {
             Alert.alert('Error', 'Failed to upload media.');
@@ -305,14 +350,6 @@ const PhotosVideoScreen = ({selectedJob}) => {
           }}>
           <>
             {item.type && item.type.toLowerCase().includes('image') ? (
-              // <Image
-              //   source={{uri: item.uri}}
-              //   style={{
-              //     ...styles.image,
-              //     width: width * 0.3,
-              //     height: width * 0.3,
-              //   }}
-              // />
               <FastImage // Use FastImage here
                 source={{
                   uri: item.uri, // Use thumbnail if available
@@ -405,7 +442,6 @@ const PhotosVideoScreen = ({selectedJob}) => {
           </Text>
           <View style={styles.dateLine} />
           <FlatList
-            // horizontal={true}
             numColumns={3}
             data={mediaList}
             keyExtractor={(item, index) => item.uri + item.date + index}
@@ -415,7 +451,6 @@ const PhotosVideoScreen = ({selectedJob}) => {
               <Text style={styles.emptyText}>No media selected</Text>
             }
             contentContainerStyle={styles.flatListContent}
-            // showsHorizontalScrollIndicator={true}
             initialScrollIndex={0}
           />
         </View>
@@ -425,8 +460,6 @@ const PhotosVideoScreen = ({selectedJob}) => {
   );
 
   const handleRangeSelect = range => {
-    // console.log(selectedRange);
-
     let startDate, endDate;
 
     switch (range) {
@@ -469,7 +502,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
         end: moment(endDate).format('MMMM D, YYYY'),
       });
 
-      fetchPhotoVideos(startDate, endDate);
+      fetchPhotoVideos(1, startDate, endDate);  // Reset to page 1 when applying date filter
     }
 
     setMenuVisible(false);
@@ -497,9 +530,8 @@ const PhotosVideoScreen = ({selectedJob}) => {
     setTempEndDate(null);
     setFilterText('Filter');
     setFilterIcon('filter');
-    fetchPhotoVideos(); // Fetch all data without date filter
+    fetchPhotoVideos(1); // Fetch all data without date filter, reset to page 1
   };
-
 
   const handleScroll = useCallback(
     event => {
@@ -626,7 +658,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
         end: moment(tempEndDate).format('MMMM D, YYYY'),
       });
       setShowCalendar(false);
-      fetchPhotoVideos(tempStartDate, tempEndDate);
+      fetchPhotoVideos(1, tempStartDate, tempEndDate);  // Reset to page 1 when applying date range
     } else {
       Alert.alert('Please select a valid date range.');
     }
@@ -723,9 +755,35 @@ const PhotosVideoScreen = ({selectedJob}) => {
       </Menu>
     </View>
   );
+
+  const renderFooter = () => {
+    if (isFetchingMore) {
+      return (
+        <View style={{ paddingVertical: 20 }}>
+          <ActivityIndicator size="large" color="#007bff" />
+        </View>
+      );
+    } else if (page >= totalPages && Object.keys(groupedMedia).length > 0) {
+      // Only show the message when all pages are loaded and there's media
+      return (
+        <TouchableOpacity
+        style={{ paddingVertical: 20, alignItems: 'center' }}
+        onPress={() => {
+          if (flatListRef.current) {
+            flatListRef.current.scrollToOffset({ offset: 0, animated: true });
+          }
+        }}
+      >
+        <Text style={{ color: '#888' }}>You have reached this project media.  Tap to return to top</Text>
+      </TouchableOpacity>
+      );
+    }
+    return null;
+  };
+
   return (
     <View style={styles.container}>
-      {apiLoading ? (
+      {apiLoading && initialLoad ? (  // Show loader if API is loading and it's the initial load
         <ActivityIndicator
           size="large"
           color="#007bff"
@@ -737,11 +795,15 @@ const PhotosVideoScreen = ({selectedJob}) => {
         </View>
       ) : (
         <FlatList
-          data={Object.entries(groupedMedia)}
-          keyExtractor={(item, index) => index.toString()}
-          renderItem={({item}) => renderDateSection(item)}
-          ListHeaderComponent={renderHeader}
-        />
+        ref={flatListRef} // Attach the ref here
+        data={Object.entries(groupedMedia)}
+        keyExtractor={(item, index) => index.toString()}
+        renderItem={({item}) => renderDateSection(item)}
+        ListHeaderComponent={renderHeader}
+        ListFooterComponent={renderFooter}  // Add footer loading indicator
+        onEndReached={handleLoadMore}        // Load more data when reaching the end
+        onEndReachedThreshold={0.5}         // Trigger load more when 50% of the list is visible
+      />
       )}
 
       <View style={styles.topRightContainer}>
@@ -773,7 +835,6 @@ const PhotosVideoScreen = ({selectedJob}) => {
         <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
           <View style={styles.modalOverlay}>
             <View style={styles.modalContainer}>
-              {/*<ScrollView>  Remove ScrollView Here */}
               <ScrollView>
                 {modalMediaLoading && (
                   <ActivityIndicator
@@ -785,29 +846,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
                 {selectedMedia &&
                   selectedMedia.type &&
                   selectedMedia.type.toLowerCase().includes('image') && (
-                    // <Image
-                    //   source={{uri: selectedMedia.uri}}
-                    //   style={styles.modalImage}
-                    //   onLoad={handleModalLoad}
-                    // />
-                    // <ImageViewer
-                    //   imageUrls={[
-                    //     {url: selectedMedia.uri, width: width, height: 400},
-                    //   ]}
-                    //   enableSwipeDown={true}
-                    //   onSwipeDown={() => setModalVisible(false)}
-                    //   style={{width: '100%', height: 400}}
-                    //   renderIndicator={() => null}
-                    //   renderHeader={() => (
-                    //     <View style={{height: 0, width: 0}} />
-                    //   )}
-                    //   backgroundColor="transparent"
-                    //   loadingRender={() => (
-                    //     <View style={styles.loadingContainer}>
-                    //       <ActivityIndicator size="large" color="#007bff" />
-                    //     </View>
-                    //   )}
-                    // />
+                    
                     <FastImage // Use FastImage here
                     source={{
                       uri: selectedMedia.uri, // Use thumbnail if available
@@ -858,7 +897,6 @@ const PhotosVideoScreen = ({selectedJob}) => {
                   )}
                 </TouchableOpacity>
               </ScrollView>
-              {/* </ScrollView> */}
               <TouchableOpacity
                 style={styles.closeModalButton}
                 onPress={() => {
@@ -939,7 +977,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     height: 120,
     position: 'relative',
-    marginBottom: 5,
+    marginBottom: 8,
     marginRight: 5,
   },
   image: {

@@ -58,9 +58,9 @@ const DocumentList = ({
   };
 
   const openModal = async document => {
-    setModalLoading(true);
-    setSelectedDocument(document);
-    setPreviewingDocumentId(document.id);
+    setPreviewingDocumentId(document.id); // Start loading for this document
+    setSelectedDocument(document); // Set the selected document
+    setImageModalVisible(false); // Ensure image modal is closed
 
     if (
       document.type &&
@@ -69,27 +69,44 @@ const DocumentList = ({
         document.type.toLowerCase() === 'jpeg')
     ) {
       setImageModalVisible(true);
-      setModalLoading(false);
-      setPreviewingDocumentId(null);
+      setPreviewingDocumentId(null); // Stop loading
     } else {
       const fileUrl = `${config.profileImage}storage/${document.file}`;
       const fileName = extractFilename(document.file) || 'unknown_file'; // Use helper function
       const localFilePath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
-      console.log("fileUrl: ", fileUrl)
-      console.log("fileName: ", fileName)
-      console.log("localFilePath: ", localFilePath)
 
       try {
         const fileExists = await RNFS.exists(localFilePath);
-        console.log("fileExists: ", fileExists)
 
         if (fileExists) {
-            console.log('Opening existing file:', localFilePath);
+          try {
+            const mimeType = getMimeType(document.type);
+            if (Platform.OS === 'android') {
+              await FileViewer.open(localFilePath, {
+                showOpenWithDialog: true,
+                mimeType: mimeType, // Specify MIME type
+              });
+            } else {
+              await FileViewer.open(localFilePath, { showOpenWithDialog: true });
+            }
+          } catch (fileViewerError) {
+            console.error('FileViewer error:', fileViewerError);
+            Alert.alert(
+              'Error',
+              `Could not open file: ${fileViewerError.message}`,
+            );
+          }
+        } else {
+          // console.log('Downloading file from:', fileUrl, 'to', localFilePath);
+          const res = await RNFS.downloadFile({
+            fromUrl: fileUrl,
+            toFile: localFilePath,
+          }).promise;
+
+          if (res.statusCode === 200) {
             try {
               const mimeType = getMimeType(document.type);
-              console.log("mimeType: ", mimeType)
               if (Platform.OS === 'android') {
-
                 await FileViewer.open(localFilePath, {
                   showOpenWithDialog: true,
                   mimeType: mimeType, // Specify MIME type
@@ -97,59 +114,23 @@ const DocumentList = ({
               } else {
                 await FileViewer.open(localFilePath, { showOpenWithDialog: true });
               }
-                setModalLoading(false);
             } catch (fileViewerError) {
               console.error('FileViewer error:', fileViewerError);
               Alert.alert(
                 'Error',
                 `Could not open file: ${fileViewerError.message}`,
               );
-              setModalLoading(false);
             }
           } else {
-            console.log('Downloading file from:', fileUrl, 'to', localFilePath);
-            const res = await RNFS.downloadFile({
-              fromUrl: fileUrl,
-              toFile: localFilePath,
-            }).promise;
-
-            console.log('Download Status Code:', res.statusCode);
-
-            if (res.statusCode === 200) {
-              console.log('Opening downloaded file:', localFilePath);
-              try {
-                const mimeType = getMimeType(document.type);
-                console.log("mimeType: ", mimeType)
-                if (Platform.OS === 'android') {
-
-                  await FileViewer.open(localFilePath, {
-                    showOpenWithDialog: true,
-                    mimeType: mimeType, // Specify MIME type
-                  });
-                } else {
-                  await FileViewer.open(localFilePath, { showOpenWithDialog: true });
-                }
-                  setModalLoading(false);
-              } catch (fileViewerError) {
-                console.error('FileViewer error:', fileViewerError);
-                Alert.alert(
-                  'Error',
-                  `Could not open file: ${fileViewerError.message}`,
-                );
-                setModalLoading(false);
-              }
-            } else {
-              Alert.alert('Error', 'Could not preview file.');
-              setModalLoading(false);
-            }
+            Alert.alert('Error', 'Could not preview file.');
           }
-        } catch (error) {
-          console.error('File download error:', error);
-          Alert.alert('Error', 'Could not preview file.');
-          setModalLoading(false);
-        } finally {
-          setPreviewingDocumentId(null);
         }
+      } catch (error) {
+        console.error('File download error:', error);
+        Alert.alert('Error', 'Could not preview file.');
+      } finally {
+        setPreviewingDocumentId(null); // Stop loading
+      }
     }
   };
 
@@ -166,7 +147,7 @@ const DocumentList = ({
     const fileExtension = document.type ? `.${document.type}` : '.pdf';  // Ensure file extension is set, or default to .pdf
     const localFilePath = `${config.profileImage}storage/${document.file}`;  // Construct full file path
   
-    console.log("Downloading from:", fileUrl);
+    // console.log("Downloading from:", fileUrl);
     console.log("Saving to:", localFilePath);
   
     try {
@@ -174,11 +155,11 @@ const DocumentList = ({
         fromUrl: fileUrl,
         toFile: localFilePath,
         begin: (res) => {
-          console.log('download begin', res);
+          // console.log('download begin', res);
         },
         progress: (res) => {
           let percentage = (res.bytesWritten / res.contentLength) * 100;
-          console.log(`Download progress: ${percentage.toFixed(2)}%`);
+          // console.log(`Download progress: ${percentage.toFixed(2)}%`);
         }
       });
   
@@ -307,15 +288,15 @@ const DocumentList = ({
                 style={styles.modalImage}
                 resizeMode="contain"
                 onLoadStart={() => {
-                  console.log('on load start');
+                  // console.log('on load start');
                   setModalLoading(true);
                 }}
                 onLoadEnd={() => {
-                  console.log('on load end');
+                  // console.log('on load end');
                   setModalLoading(false);
                 }}
                 onError={() => {
-                  console.log('error');
+                  // console.log('error');
                   setModalLoading(false);
                 }}
               />

@@ -37,9 +37,9 @@ const VerticalStepIndicator = React.memo(({ milestoneData = [] }) => {
   const stepIndicatorSize = 35; // Define stepIndicatorSize
   const customStepStyles = {
     stepIndicatorSize: stepIndicatorSize, //Use stepIndicatorSize
-    separatorStrokeWidth: 0.5,
-    currentStepStrokeWidth: 0.5,
-    stepStrokeWidth: 0.5,
+    separatorStrokeWidth: 1,
+    currentStepStrokeWidth: 1,
+    stepStrokeWidth: 1,
     stepStrokeFinishedColor: Colors.unfinishedbg,
     stepStrokeUnFinishedColor: Colors.unfinishedbg,
     separatorFinishedColor: Colors.unfinishedbg,

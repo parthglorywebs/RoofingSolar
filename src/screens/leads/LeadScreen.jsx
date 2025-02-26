@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useCallback, useMemo} from 'react';
+import React, {useState, useEffect, useCallback, useMemo, useRef} from 'react';
 import {
   SafeAreaView,
   StatusBar,
@@ -14,8 +14,8 @@ import {
   Dimensions,
   TouchableWithoutFeedback,
   ActivityIndicator,
-  Platform, 
-  Linking
+  Platform,
+  Linking,
 } from 'react-native';
 import {useColorScheme} from 'react-native';
 import Colors from '../../assets/styling/colors';
@@ -69,6 +69,11 @@ const LeadScreen = ({route}) => {
   const [isFilterModalVisible, setFilterModalVisible] = useState(false);
   const [selectedFilterStage, setSelectedFilterStage] = useState(null);
 
+  // State for pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [lastPage, setLastPage] = useState(1);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+
   const isDarkMode = useColorScheme() === 'dark';
   const backgroundStyle = {
     backgroundColor: isDarkMode ? '#333' : Colors.black,
@@ -76,6 +81,8 @@ const LeadScreen = ({route}) => {
 
   const [selectedChip, setSelectedChip] = useState(null);
 
+  const flatListRef = useRef(null);
+  
   useEffect(() => {
     if (itemData) {
       // console.log('Item Data on Leads screen:', itemData);
@@ -84,55 +91,80 @@ const LeadScreen = ({route}) => {
   }, [itemData]);
 
   useEffect(() => {
-    fetchProjectList(selectedFilterStage);
+    fetchProjectList(selectedFilterStage, 1); // Fetch initial data
   }, [fetchProjectList, selectedFilterStage]);
 
-  const fetchProjectList = useCallback(async stage => {
-    const {access_token, contractor_id} = await getLoginDetails();
-    try {
-      setLoading(true);
+  const fetchProjectList = useCallback(
+    async (stage, page) => {
+      const {access_token, contractor_id} = await getLoginDetails();
+      try {
+        // Removed setLoading(true) here
 
-      const requestData = {
-        contractor_id: contractor_id,
-        stage: '',
-        page: 1
-      };
-      if (stage) {
-        requestData.stage = stage;
-      }
+        setErrorList(null); // Clear any existing errors
+        setIsFetchingMore(true); // Start loading
 
-      const response = await axios.post(
-        `${config.baseUrl}contractor/project-listing`,
-        requestData,
-        {
-          headers: {
-            Authorization: `Bearer ${access_token}`,
+        const requestData = {
+          contractor_id: contractor_id,
+          stage: stage || '',
+          page: page,
+        };
+
+        const response = await axios.post(
+          `${config.baseUrl}contractor/project-listing`,
+          requestData,
+          {
+            headers: {
+              Authorization: `Bearer ${access_token}`,
+            },
           },
-        },
-      );
+        );
 
-      if (
-        response &&
-        response.data &&
-        response.data.success &&
-        response.data.data &&
-        response.data.data.data
-      ) {
-        setProjectListData(response.data.data.data);
-      } else {
-        console.error('No Data found for Project List.');
-        setErrorList('No data received');
-        setProjectListData([]); // Clear the project list
+        if (
+          response &&
+          response.data &&
+          response.data.success &&
+          response.data.data &&
+          response.data.data.data
+        ) {
+          const newData = response.data.data.data;
+          const paginationInfo = response.data.data.pagination;
+
+          // Update state based on whether we're loading initial data or fetching more
+          if (page === 1) {
+            // Initial load: replace existing data
+            setProjectListData(newData);
+          } else {
+            // Subsequent loads: append new data to existing data
+            setProjectListData(prevData => [...prevData, ...newData]);
+          }
+
+          setLastPage(paginationInfo.last_page);
+          setCurrentPage(paginationInfo.current_page);
+        } else {
+          console.error('No Data found for Project List.');
+          setErrorList('No data received');
+          if (page === 1) {
+            setProjectListData([]); // Clear the project list only on the first page
+          }
+        }
+
+        // setLoading(false);  Removed
+        setIsFetchingMore(false); // Reset fetching more state
+      } catch (error) {
+        console.error('Error fetching contractor profile:', error);
+        // setLoading(false); Removed
+        setIsFetchingMore(false); // Reset fetching more state
+        setErrorList('Failed to load project list.');
       }
+    },
+    [],
+  );
 
-
-      setLoading(false);
-    } catch (error) {
-      console.error('Error fetching contractor profile:', error);
-      setLoading(false);
-      setErrorList('Failed to load project list.');
+  const handleLoadMore = () => {
+    if (currentPage < lastPage && !isFetchingMore && !loading) {
+      fetchProjectList(selectedFilterStage, currentPage + 1); // Now the function setIsFetchingMore(true) from starting of function fetchProjectList
     }
-  }, []);
+  };
 
   const handlePropertyPress = useCallback(item => {
     setSelectedChip(item.id);
@@ -151,12 +183,18 @@ const LeadScreen = ({route}) => {
 
   const handleStageSelect = stage => {
     setSelectedFilterStage(stage);
+    setCurrentPage(1); // Reset to first page when stage changes
+    fetchProjectList(stage, 1); // Fetch data for the selected stage
     closeFilterModal();
   };
+
   const handleResetFilter = () => {
     setSelectedFilterStage(null);
+    setCurrentPage(1); // Reset to first page when filter is reset
+    fetchProjectList(null, 1); // Fetch all data
     closeFilterModal();
   };
+
   const openModal = useCallback(job => {
     setSelectedJob(job);
     setModalVisible(true);
@@ -227,7 +265,7 @@ const LeadScreen = ({route}) => {
       if (response && response.data && response.data.success) {
         Alert.alert('Success', 'Project Added Successfully');
         closeModalAdvance();
-        fetchProjectList();
+        fetchProjectList(selectedFilterStage, 1); // Refresh data from page 1 after adding a project
       } else {
         Alert.alert('Failed', 'Failed to add project');
       }
@@ -246,6 +284,7 @@ const LeadScreen = ({route}) => {
     address,
     closeModalAdvance,
     fetchProjectList,
+    selectedFilterStage,
   ]);
 
   const handleFocus = useCallback(
@@ -257,18 +296,18 @@ const LeadScreen = ({route}) => {
 
   const handlePropertyDetail = useCallback(() => {
     if (!selectedJob) {
-      console.warn("selectedJob is undefined, cannot navigate to PropertyInfo");
+      console.warn('selectedJob is undefined, cannot navigate to PropertyInfo');
       return;
     }
     // console.log({...selectedJob});
-    
+
     navigation.navigate('PropertyInfo', {
       itemData: {
         ...selectedJob,
         currentStage: itemData?.currentStage || selectedJob?.stage_name,
         progress: selectedJob.progress?.props?.progress,
-        totalAmount: selectedJob?.balancedue?.totalAmount, 
-        balanceDue: selectedJob?.balancedue?.balanceDue, 
+        totalAmount: selectedJob?.balancedue?.totalAmount,
+        balanceDue: selectedJob?.balancedue?.balanceDue,
         percentage: selectedJob?.balancedue?.percentage,
       },
       selectedJob: selectedJob,
@@ -304,7 +343,7 @@ const LeadScreen = ({route}) => {
     [selectedChip, handlePropertyPress],
   );
 
-  const getCircleColors = useCallback(  
+  const getCircleColors = useCallback(
     currentStage => {
       switch (currentStage) {
         case 'lead':
@@ -367,6 +406,31 @@ const LeadScreen = ({route}) => {
       </View>
     );
   }, []);
+
+  const renderFooter = () => {
+    if (isFetchingMore) {
+      return (
+        <View style={styles.loadingMoreContainer}>
+          <ActivityIndicator size="small" color={Colors.primary} />
+        </View>
+      );
+    } else if (currentPage >= lastPage && projectListData.length > 0) {
+      // Only show the message when all pages are loaded and there's media
+      return (
+        <TouchableOpacity
+          style={{ paddingVertical: 20, alignItems: 'center' }}
+          onPress={() => {
+            if (flatListRef.current) {
+              flatListRef.current.scrollToOffset({ offset: 0, animated: true });
+            }
+          }}
+        >
+          <Text style={{ color: '#888' }}>You have reached project list limit.  Tap to return to top</Text>
+        </TouchableOpacity>
+      );
+    }
+    return null;
+  };
 
   const renderProjectList = useMemo(
     () =>
@@ -437,54 +501,19 @@ const LeadScreen = ({route}) => {
             <View style={styles.dividerList} />
 
             <View>
-              <View style={{flexDirection: 'column', paddingHorizontal: 10, marginBottom: 10}}>
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}>
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      // alignItems: 'center',
-                      flex: 1.5,
-                      
-                    }}>
-                    <Text
-                      style={{
-                        fontSize: 14,
-                        color: Colors.themeBlack,
-                        textAlign: 'left',
-                      }}>
+              <View style={styles.renderBottomContainer}>
+                <View style={styles.renderRowContainer}>
+                  <View style={styles.rowDirectionView}>
+                    <Text style={styles.textTotalAmount}>
                       {'$' + project?.balancedue?.totalAmount}
                     </Text>
-                    <Text
-                      style={{
-                        fontSize: 14,
-                        color: Colors.red,
-                        paddingHorizontal: 5,
-                        textAlign: 'left', 
-                      }}>
+                    <Text style={styles.textBalance}>
                       {'$' + project?.balancedue?.balanceDue}
                     </Text>
                   </View>
 
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      flex: 1, 
-                      justifyContent: 'flex-end',
-                      // paddingHorizontal: 5,
-                    }}>
-                    <Text
-                      style={{
-                        fontSize: 16,
-                        color: Colors.themePlaceHolder,
-                        paddingHorizontal: 5,
-                        textAlign: 'right',
-                      }}>
+                  <View style={styles.viewPercentage}>
+                    <Text style={styles.textPercentage}>
                       {project?.balancedue?.percentage + '%'}
                     </Text>
                     <Progress.Bar
@@ -511,118 +540,116 @@ const LeadScreen = ({route}) => {
     [filteredProjects, getCircleInfo, itemData, openModal],
   );
 
-  const handleCallPress = useCallback(async phoneNumber => {
-    if (!selectedJob) {
-      Alert.alert('Error', 'No contact selected');
-      return;
-    }
-    let cleanedPhoneNumber = encodeURIComponent(
-      phoneNumber.replace(/[^0-9+]/g, ''),
-    );
-    const countryCode =
-      countries.find(item => item.code === selectedJob?.country_code)
-        ?.dial_code || '+1';
-    cleanedPhoneNumber = countryCode + cleanedPhoneNumber;
+  const handleCallPress = useCallback(
+    async phoneNumber => {
+      if (!selectedJob) {
+        Alert.alert('Error', 'No contact selected');
+        return;
+      }
+      let cleanedPhoneNumber = encodeURIComponent(
+        phoneNumber.replace(/[^0-9+]/g, ''),
+      );
+      const countryCode =
+        countries.find(item => item.code === selectedJob?.country_code)
+          ?.dial_code || '+1';
+      cleanedPhoneNumber = countryCode + cleanedPhoneNumber;
 
-    let url;
-    if (Platform.OS === 'ios') {
-      url = `facetime:${cleanedPhoneNumber}`; 
-    } else {
-      url = `tel:${cleanedPhoneNumber}`; 
-    }
-
-    try {
-      const supported = await Linking.canOpenURL(url);
-
-      if (supported) {
-        await Linking.openURL(url);
+      let url;
+      if (Platform.OS === 'ios') {
+        url = `facetime:${cleanedPhoneNumber}`;
       } else {
-        if (Platform.OS === 'ios') {
-          Alert.alert(
-            'FaceTime not available',
-            'Falling back to a regular phone call.',
-          );
-        }
-        const telUrl =
-          Platform.OS === 'android'
-            ? `tel:${cleanedPhoneNumber}`
-            : `telprompt:${cleanedPhoneNumber}`;
-        const callSupported = await Linking.canOpenURL(telUrl);
-        if (callSupported) {
-          await Linking.openURL(telUrl);
+        url = `tel:${cleanedPhoneNumber}`;
+      }
+
+      try {
+        const supported = await Linking.canOpenURL(url);
+
+        if (supported) {
+          await Linking.openURL(url);
         } else {
-          Alert.alert(`Error to open: ${telUrl}`);
+          if (Platform.OS === 'ios') {
+            Alert.alert(
+              'FaceTime not available',
+              'Falling back to a regular phone call.',
+            );
+          }
+          const telUrl =
+            Platform.OS === 'android'
+              ? `tel:${cleanedPhoneNumber}`
+              : `telprompt:${cleanedPhoneNumber}`;
+          const callSupported = await Linking.canOpenURL(telUrl);
+          if (callSupported) {
+            await Linking.openURL(telUrl);
+          } else {
+            Alert.alert(`Error to open: ${telUrl}`);
+          }
         }
+      } catch (error) {
+        console.error('An error occurred', error);
+        Alert.alert('Call Failed', `Unable to open: ${error.message}`);
       }
-    } catch (error) {
-      console.error('An error occurred', error);
-      Alert.alert('Call Failed', `Unable to open: ${error.message}`);
-    }
-  }, [selectedJob]);
+    },
+    [selectedJob],
+  );
 
-
-  const handleEmail = useCallback(async email => {
-    if (!selectedJob) {
-      Alert.alert("Error", "No contact selected");
-      return;
-    }
-    const url = `mailto:${email}`;
-    try {
-      // const supported = await Linking.canOpenURL(url);
-      // if (supported) {
-      //   await Linking.openURL(url);
-      // } else {
-      //   Alert.alert(`Error to open : ${url}`);
-      // }
-      Linking.openURL('https://mail.google.com/mail/u/0/#inbox?compose=new');
-
-    } catch (error) {
-      console.error("An error occurred", error);
-      Alert.alert("Email Failed", `Unable to open the email app: ${error.message}`);
-    }
-  }, [selectedJob]);
-
-  const handleMap = useCallback(async address => {
-    if (!selectedJob) {
-      Alert.alert("Error", "No contact selected");
-      return;
-    }
-    const encodedAddress = encodeURIComponent(address);
-    const url = Platform.select({
-      ios: `maps://?q=${encodedAddress}`,
-      android: `geo:0,0?q=${encodedAddress}`,
-    });
-
-    try {
-      const supported = await Linking.canOpenURL(url);
-
-      if (supported) {
-        await Linking.openURL(url);
-      } else {
-        Alert.alert(`Don't know how to open this URL: ${url}`);
+  const handleEmail = useCallback(
+    async email => {
+      if (!selectedJob) {
+        Alert.alert('Error', 'No contact selected');
+        return;
       }
-    } catch (error) {
-      console.error("An error occurred", error);
-      Alert.alert("Map Failed", `Unable to open the map app: ${error.message}`);
-    }
-  }, [selectedJob]);
+      const url = `mailto:${email}`;
+      try {
+        // const supported = await Linking.canOpenURL(url);
+        // if (supported) {
+        //   await Linking.openURL(url);
+        // } else {
+        //   Alert.alert(`Error to open : ${url}`);
+        // }
+        Linking.openURL('https://mail.google.com/mail/u/0/#inbox?compose=new');
+      } catch (error) {
+        console.error('An error occurred', error);
+        Alert.alert(
+          'Email Failed',
+          `Unable to open the email app: ${error.message}`,
+        );
+      }
+    },
+    [selectedJob],
+  );
+
+  const handleMap = useCallback(
+    async address => {
+      if (!selectedJob) {
+        Alert.alert('Error', 'No contact selected');
+        return;
+      }
+      const encodedAddress = encodeURIComponent(address);
+      const url = Platform.select({
+        ios: `maps://?q=${encodedAddress}`,
+        android: `geo:0,0?q=${encodedAddress}`,
+      });
+
+      try {
+        const supported = await Linking.canOpenURL(url);
+
+        if (supported) {
+          await Linking.openURL(url);
+        } else {
+          Alert.alert(`Don't know how to open this URL: ${url}`);
+        }
+      } catch (error) {
+        console.error('An error occurred', error);
+        Alert.alert(
+          'Map Failed',
+          `Unable to open the map app: ${error.message}`,
+        );
+      }
+    },
+    [selectedJob],
+  );
 
   const renderContent = useMemo(() => {
-    if (loading) {
-      return (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-        </View>
-      );
-    }
-    if (errorList) {
-      return (
-        <View style={styles.emptyStateContainer}>
-          <Text style={styles.errorText}>Error: {errorList}</Text>
-        </View>
-      );
-    }
-
     return (
       <View
         style={{
@@ -675,12 +702,20 @@ const LeadScreen = ({route}) => {
             value={searchText}
           />
         </View>
-        {projectListData.length === 0 && !loading
-          ? renderEmptyState()
-          : filteredProjects.length > 0
-          ? renderProjectList
-          : null}
-
+        {loading && currentPage === 1 ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+          </View>
+        ) : errorList ? (
+          <View style={styles.emptyStateContainer}>
+            <Text style={styles.errorText}>Error: {errorList}</Text>
+          </View>
+        ) : projectListData.length === 0 ? (
+          renderEmptyState()
+        ) : (
+          renderProjectList
+        )}
+        {/*  Removed `!loading && !isFetchingMore`  and put condition inside main content */}
         <Modal
           animationType="slide"
           transparent={true}
@@ -697,51 +732,55 @@ const LeadScreen = ({route}) => {
                         {selectedJob?.title}
                       </Text>
                       <View style={styles.modalDetail}>
-                      <TouchableOpacity onPress={() => handleCallPress(selectedJob.phone)}>
-
-                        <View style={styles.callDetail}>
-                          <MaterialCommunityIcons
-                            name="phone"
-                            size={18}
-                            color={Colors.themePlaceHolder}
-                          />
-                          <Text style={styles.modalLabel}>
-                            {countries.find(
-                              item => item.code === selectedJob?.country_code,
-                            )?.dial_code || '+1'}
-                            {selectedJob.phone}
-                          </Text>
-                        </View>
+                        <TouchableOpacity
+                          onPress={() => handleCallPress(selectedJob.phone)}>
+                          <View style={styles.callDetail}>
+                            <MaterialCommunityIcons
+                              name="phone"
+                              size={18}
+                              color={Colors.themePlaceHolder}
+                            />
+                            <Text style={styles.modalLabel}>
+                              {countries.find(
+                                item => item.code === selectedJob?.country_code,
+                              )?.dial_code || '+1'}
+                              {selectedJob.phone}
+                            </Text>
+                          </View>
                         </TouchableOpacity>
 
                         <View style={styles.divider} />
-                        <TouchableOpacity onPress={() => handleEmail(selectedJob.customer_email)}>
-
-                        <View style={styles.callDetail}>
-                          <MaterialCommunityIcons
-                            name="email"
-                            size={18}
-                            color={Colors.themePlaceHolder}
-                          />
-                          <Text style={styles.modalLabel}>
-                            {selectedJob.customer_email}
-                          </Text>
-                        </View>
+                        <TouchableOpacity
+                          onPress={() =>
+                            handleEmail(selectedJob.customer_email)
+                          }>
+                          <View style={styles.callDetail}>
+                            <MaterialCommunityIcons
+                              name="email"
+                              size={18}
+                              color={Colors.themePlaceHolder}
+                            />
+                            <Text style={styles.modalLabel}>
+                              {selectedJob.customer_email}
+                            </Text>
+                          </View>
                         </TouchableOpacity>
 
                         <View style={styles.divider} />
-                        <TouchableOpacity onPress={() => handleMap(selectedJob.address)}>
-
-                        <View style={styles.callDetail}>
-                          <MaterialCommunityIcons
-                            name="map-marker"
-                            size={18}
-                            color={Colors.themePlaceHolder}
-                          />
-                          <Text style={styles.modalLabel}>
-                            {selectedJob.address ? selectedJob.address : '---'}
-                          </Text>
-                        </View>
+                        <TouchableOpacity
+                          onPress={() => handleMap(selectedJob.address)}>
+                          <View style={styles.callDetail}>
+                            <MaterialCommunityIcons
+                              name="map-marker"
+                              size={18}
+                              color={Colors.themePlaceHolder}
+                            />
+                            <Text style={styles.modalLabel}>
+                              {selectedJob.address
+                                ? selectedJob.address
+                                : '---'}
+                            </Text>
+                          </View>
                         </TouchableOpacity>
 
                         <View style={styles.divider} />
@@ -1007,6 +1046,9 @@ const LeadScreen = ({route}) => {
     handleCallPress,
     handleEmail,
     handleMap,
+    isFetchingMore,
+    currentPage,
+    renderEmptyState, // Important: Add renderEmptyState to dependencies
   ]);
 
   return (
@@ -1016,9 +1058,13 @@ const LeadScreen = ({route}) => {
         backgroundColor={backgroundStyle.backgroundColor}
       />
       <FlatList
+        ref={flatListRef} 
         data={[{key: 'content', component: renderContent}]}
         keyExtractor={item => item.key}
         renderItem={() => renderContent}
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={renderFooter}
       />
     </SafeAreaView>
   );
@@ -1308,7 +1354,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 10,
-    paddingHorizontal: 10
+    paddingHorizontal: 10,
     // marginVertical: 10,
   },
   jobActivityCard: {
@@ -1360,6 +1406,49 @@ const styles = StyleSheet.create({
     marginBottom: 5,
     paddingHorizontal: 10,
     color: Colors.themePlaceHolder,
+  },
+  renderBottomContainer: {
+    flexDirection: 'column',
+    paddingHorizontal: 10,
+    marginBottom: 10,
+  },
+  renderRowContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  rowDirectionView: {
+    flexDirection: 'row',
+    // alignItems: 'center',
+    flex: 1.5,
+  },
+  textTotalAmount: {
+    fontSize: 14,
+    color: Colors.themeBlack,
+    textAlign: 'left',
+  },
+  textBalance: {
+    fontSize: 14,
+    color: Colors.red,
+    paddingHorizontal: 5,
+    textAlign: 'left',
+  },
+  viewPercentage: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'flex-end',
+    // paddingHorizontal: 5,
+  },
+  textPercentage: {
+    fontSize: 16,
+    color: Colors.themePlaceHolder,
+    paddingHorizontal: 5,
+    textAlign: 'right',
+  },
+  loadingMoreContainer: {
+    paddingVertical: 20,
+    alignItems: 'center',
   },
 });
 

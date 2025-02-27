@@ -1,20 +1,18 @@
-name: Build Android Debug APK and Send Email
+name: Send Test Email via SMTP
 
 on:
   push:
-    branches: [ dev ]
-  pull_request:
-    branches: [ dev ]
+    branches: [dev]
 
 jobs:
   send_email:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Install sendEmail
+      - name: Install Required Dependencies (Fix TLS)
         run: |
           sudo apt-get update
-          sudo apt-get install -y sendemail
+          sudo apt-get install -y sendemail libio-socket-ssl-perl libnet-ssleay-perl
 
       - name: Send Test Email via SMTP
         run: |

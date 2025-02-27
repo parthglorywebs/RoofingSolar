@@ -13,8 +13,8 @@ jobs:
         uses: hilarion5/send-mail@v1
         with:
           smtp-server: smtp.gmail.com
-          smtp-port: 587
-          smtp-secure: true
+          smtp-port: 587  # Use port 587 for STARTTLS
+          smtp-secure: false  # Must be false for STARTTLS
           from-email: ${{ secrets.MAIL_USERNAME }}
           to-email: Parthm@glorywebsdev.com
           username: ${{ secrets.MAIL_USERNAME }}
@@ -23,5 +23,5 @@ jobs:
           body: "Hello Parth, this is a test email sent from GitHub Actions!"
           html: |
             <h1>Hello Parth 👋</h1>
-            <p>This is a test email sent from <strong>GitHub Actions</strong>.</p>
+            <p>This is a test email from <strong>GitHub Actions</strong>.</p>
             <p><b>SMTP Email Sending is Working ✅</b></p>

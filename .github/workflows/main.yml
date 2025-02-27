@@ -57,10 +57,21 @@ jobs:
       - name: Upload APK to File.io
         id: upload_apk
         run: |
+          echo "Attempting to upload APK..."
+          RESPONSE=$(curl -v -F "file=@android/app/build/outputs/apk/debug/app-debug.apk" https://file.io)
+          CURL_EXIT_CODE=$?  # Capture curl's exit code
+
+          echo "File.io Response: $RESPONSE"
+          echo "curl Exit Code: $CURL_EXIT_CODE"
+
+          if [[ $CURL_EXIT_CODE -ne 0 ]]; then
+            echo "::error title=File.io Upload Failed::curl command failed with exit code $CURL_EXIT_CODE.  Check network connectivity and File.io status."
+            exit 1
+          fi
           UPLOAD_URL=$(echo "$RESPONSE" | jq -r '.link')
 
           if [[ -z "$UPLOAD_URL" ]]; then
-            echo "::error title=File.io Upload Failed::Failed to upload APK to File.io. Response: $RESPONSE"
+            echo "::error title=File.io Upload Failed::Failed to extract link from File.io response.  Response: $RESPONSE"
             exit 1 # Fail the workflow
           fi
 
@@ -77,14 +88,13 @@ jobs:
         if: success()
         run: |
           APP_PASSWORD="ktut btyz bnmv xqwo"
-
-          sendEmail -f ${{ "Parthm@glorywebsdev.com" }} \
+          sendEmail -f ${{ secrets.MAIL_USERNAME }} \
                   -t Parthm@glorywebsdev.com \
                   -s smtp.gmail.com:587 \
                   -xu ${{ secrets.MAIL_USERNAME }} \
                   -xp "$APP_PASSWORD" \
-                  -v -v -v \ 
-                  -o tls=yes \ 
-                  -u "Test Email" \ 
-                  -m "This is a test email." 
-        shell: bash          
+                  -v -v -v \
+                  -o tls=yes \
+                  -u "Test Email" \
+                  -m "This is a test email."
+        shell: bash

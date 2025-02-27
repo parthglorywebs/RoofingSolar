@@ -26,7 +26,7 @@ jobs:
         env:
           SENDINBLUE_API_KEY: ${{ secrets.SENDINBLUE_API_KEY }}  # Store in GitHub Secrets
           TO_EMAIL: Parthm@glorywebsdev.com
-          FROM_EMAIL: parthglory2025@gmail.com  # IMPORTANT: REPLACE WITH YOUR *VERIFIED* SENDER IN SENDINBLUE
+          FROM_EMAIL: parthglory2025@gmail.com  # MUST BE VERIFIED IN SENDINBLUE!
           SUBJECT: "GitHub Actions Test Email (To Parthm - Sendinblue)"
           BODY: "This is a sample test email sent from GitHub Actions to Parthm@glorywebsdev.com using Sendinblue!"
         run: |
@@ -34,7 +34,7 @@ jobs:
           import requests
           import os
 
-          url = 'https://api.sendinblue.com/v3/smtp/email'  # Corrected endpoint
+          url = 'https://api.sendinblue.com/v3/smtp/email'
           headers = {
               'accept': 'application/json',
               'content-type': 'application/json',
@@ -44,7 +44,7 @@ jobs:
               'sender': {'email': os.environ['FROM_EMAIL'], 'name': 'GitHub Actions'},
               'to': [{'email': os.environ['TO_EMAIL']}],
               'subject': os.environ['SUBJECT'],
-              'htmlContent': f'<p>{os.environ['BODY']}</p>'  # Sendinblue wants HTML
+              'htmlContent': f'<p>{os.environ['BODY']}</p>' # Sendinblue wants HTML
           }
           response = requests.post(url, headers=headers, json=data)
           response.raise_for_status()

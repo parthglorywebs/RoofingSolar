@@ -9,22 +9,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Install Required Dependencies (Fix TLS)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y sendemail libio-socket-ssl-perl libnet-ssleay-perl
-
       - name: Send Email Notification
-        env:
-          MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
-          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
-        run: |
-          sendEmail -f "$MAIL_USERNAME" \
-                    -t "recipient@example.com" \
-                    -s smtp.gmail.com:587 \
-                    -xu "$MAIL_USERNAME" \
-                    -xp "$MAIL_PASSWORD" \
-                    -o tls=yes \
-                    -u "Test Email from GitHub Actions" \
-                    -m "Hello, this is a test email from GitHub Actions!"
-        shell: bash
+        uses: hilarion5/send-mail@v1
+        with:
+          smtp-server: smtp.gmail.com
+          smtp-port: 587
+          smtp-secure: true
+          from-email: ${{ secrets.MAIL_USERNAME }}
+          to-email: Parthm@glorywebsdev.com 
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "Test Email from GitHub Actions"
+          body: "Hello, this is a test email sent from GitHub Actions!"
+          html: |
+            <h1>This is a test email</h1>
+            <p>Test Paragraph</p>

@@ -1,4 +1,4 @@
-name: Build Android Debug APK
+name: Build Android Debug APK and Send Email
 
 on:
   push:
@@ -8,6 +8,7 @@ on:
 
 jobs:
   build:
+
     runs-on: ubuntu-latest
 
     steps:
@@ -24,32 +25,64 @@ jobs:
       with:
         node-version: '18.x'
 
+    - name: Cache Gradle packages
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+
+    - name: Cache Android SDK
+      uses: actions/cache@v3
+      with:
+        path: ~/android/sdk
+        key: ${{ runner.os }}-android-sdk
+        restore-keys: ${{ runner.os }}-android-sdk
+
     - name: Install dependencies
       run: |
         npm install
         cd android
-        ./gradlew clean
 
     - name: Assemble Debug
       run: |
         cd android
         ./gradlew assembleDebug
 
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: app-debug.apk
-        path: android/app/build/outputs/apk/debug/app-debug.apk
+    - name: Install jq
+      run: sudo apt-get update && sudo apt-get install jq
 
-    - name: Send APK via Email
-      uses: dawidd6/action-send-mail@v3
-      with:
-        server_address: smtp.gmail.com
-        server_port: 465
-        username: ${{ secrets.EMAIL_USERNAME }}
-        password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: "Android Debug APK Build"
-        body: "Hello, \n\nPlease find the attached Debug APK.\n\nRegards,\nGitHub Actions"
-        to: "parthglory2025@gmail.com"
-        from: "parthglory2025@gmail.com"
-        attachments: android/app/build/outputs/apk/debug/app-debug.apk
+    - name: Upload APK to File.io
+      id: upload_apk
+      run: |
+        RESPONSE=$(curl -F "file=@android/app/build/outputs/apk/debug/app-debug.apk" https://file.io)
+        UPLOAD_URL=$(echo "$RESPONSE" | jq -r '.link')
+
+        if [[ -z "$UPLOAD_URL" ]]; then
+          echo "::error title=File.io Upload Failed::Failed to upload APK to File.io. Response: $RESPONSE"
+          exit 1 # Fail the workflow
+        fi
+
+        echo "apk_url=$UPLOAD_URL" >> $GITHUB_ENV
+        echo "APK uploaded to File.io.  URL: $UPLOAD_URL"
+      continue-on-error: false
+
+    - name: Install sendEmail
+      run: |
+        sudo apt-get update
+        sudo apt-get install sendemail
+
+    - name: Send Email with sendEmail
+      if: success()
+      run: |
+        sendEmail -f ${{ secrets.MAIL_USERNAME }} \
+                  -t Parthm@glorywebsdev.com \
+                  -s smtp.gmail.com:587 \
+                  -xu ${{ secrets.MAIL_USERNAME }} \
+                  -xp ${{ secrets.MAIL_PASSWORD }} \
+                  -u "New Android Debug APK Build Available" \
+                  -m "A new Android Debug APK build is available for testing.\n\nYou can download the APK from File.io using the following link:\n${{ env.apk_url }}\n\n**Please note that File.io links are typically only valid for a single download.**\n\nWorkflow run URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+      shell: bash

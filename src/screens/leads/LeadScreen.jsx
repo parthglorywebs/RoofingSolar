@@ -129,13 +129,13 @@ const LeadScreen = ({route}) => {
           const newData = response.data.data.data;
           const paginationInfo = response.data.data.pagination;
 
-          // Update state based on whether we're loading initial data or fetching more
+          // Update state based on whether we're loading initial data or fetching more 
           if (page === 1) {
             // Initial load: replace existing data
             setProjectListData(newData);
           } else {
             // Subsequent loads: append new data to existing data
-            setProjectListData(prevData => [...prevData, ...newData]);
+            setProjectListData(prevData => [...prevData, ...newData]);   
           }
 
           setLastPage(paginationInfo.last_page);

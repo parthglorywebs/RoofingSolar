@@ -1,4 +1,4 @@
-name: Build Android Debug APK and Send Email
+name: Build Android Debug APK
 
 on:
   push:
@@ -25,11 +25,27 @@ jobs:
       with:
         node-version: '18.x'
 
+    - name: Cache Gradle packages
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+
+    - name: Cache Android SDK
+      uses: actions/cache@v3
+      with:
+        path: ~/android/sdk
+        key: ${{ runner.os }}-android-sdk
+        restore-keys: ${{ runner.os }}-android-sdk
+
     - name: Install dependencies
       run: |
         npm install
         cd android
-        ./gradlew clean
 
     - name: Assemble Debug
       run: |
@@ -52,21 +68,24 @@ jobs:
           const runURL = `https://github.com/${repo}/actions/runs/${runId}`;
           core.setOutput('run_url', runURL);
 
-    - name: Send Email with APK Link
-      uses: dawidd6/action-send-mail@v3 # Use a dedicated email sending action
+    - name: Send Email with Workflow Run URL
+      uses: dawidd6/action-send-mail@v3
       with:
-        server_address: smtp.gmail.com #or outlook.com
-        server_port: 465 #or 587 if your smtp support tls connection
-        username: ${{secrets.MAIL_USERNAME}} # your smtp email address
-        password: ${{secrets.MAIL_PASSWORD}}
-        subject: "Debug APK Build Available"
+        server_address: smtp.gmail.com
+        server_port: 465
+        username: ${{ secrets.MAIL_USERNAME }} # Still needed for sending email
+        password: ${{ secrets.MAIL_PASSWORD }} # Still needed for sending email
+        subject: "New Android Debug APK Build Available"
         to: parthglory2025@gmail.com
-        from: ${{secrets.MAIL_USERNAME}}
+        from: ${{ secrets.MAIL_USERNAME }}
         body: |
-          A new debug APK build is available for testing.
+          A new Android Debug APK build is available for testing.
 
-          You can download it from the workflow run page.
-          This link will direct you to the GitHub Action workflow for this build, 
-          where you can download app-debug.apk.
-           Workflow Run URL: ${{ steps.workflow_run_url.outputs.run_url }}
-        secure: true #or false if your smtp support tls connection
+          Please follow these steps to download the APK:
+
+          1. Click on the link below to go to the GitHub Actions workflow run page:
+             https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          2. Scroll down to the "Artifacts" section at the bottom of the page.
+          3. Click on "app-debug.apk" to download the APK file.
+
+        secure: true

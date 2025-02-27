@@ -25,12 +25,27 @@ jobs:
         run: |
           echo "Sending email from: $MAIL_USERNAME" # Diagnostic output
           sleep 5 #Give time for all dependencies to install.
-          sendEmail -f "$MAIL_USERNAME" \
-                    -t "Parthm@glorywebsdev.com" \
-                    -s smtp.gmail.com:587 \
-                    -xu "$MAIL_USERNAME" \
-                    -xp "$MAIL_PASSWORD" \
-                    -o tls=yes \
-                    -u "Test Email from GitHub Actions" \
-                    -m "Hello, this is a test email from GitHub Actions!"
+
+          # Try sending the email, capturing the output and exit code
+          email_output=$(sendEmail -f "$MAIL_USERNAME" \
+                                   -t "Parthm@glorywebsdev.com" \
+                                   -s smtp.gmail.com:587 \
+                                   -xu "$MAIL_USERNAME" \
+                                   -xp "$MAIL_PASSWORD" \
+                                   -o tls=yes \
+                                   -a 'From: yourname@gmail.com' \
+                                   -u "Test Email from GitHub Actions" \
+                                   -m "Hello, this is a test email from GitHub Actions!" 2>&1) # Capture stderr too
+          email_exit_code=$?
+
+          echo "sendEmail Output:"
+          echo "$email_output"
+
+          # Check the exit code
+          if [ $email_exit_code -ne 0 ]; then
+            echo "sendEmail Failed with exit code: $email_exit_code"
+            exit 1  # Fail the workflow if sending the email failed
+          else
+            echo "sendEmail Succeeded!"
+          fi
         shell: bash

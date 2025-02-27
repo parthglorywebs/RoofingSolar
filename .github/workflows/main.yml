@@ -1,10 +1,10 @@
-name: Build Android Debug APK
+name: Build Android Debug APK and Send Email
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, dev ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, dev ]
 
 jobs:
   build:
@@ -41,3 +41,32 @@ jobs:
       with:
         name: app-debug.apk
         path: android/app/build/outputs/apk/debug/app-debug.apk
+
+    - name: Get Workflow Run URL
+      id: workflow_run_url
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const runId = context.runId;
+          const repo = context.repo.owner + "/" + context.repo.repo;
+          const runURL = `https://github.com/${repo}/actions/runs/${runId}`;
+          core.setOutput('run_url', runURL);
+
+    - name: Send Email with APK Link
+      uses: dawidd6/action-send-mail@v3 # Use a dedicated email sending action
+      with:
+        server_address: smtp.gmail.com
+        server_port: 465
+        username: parthglory2025@gmail.com  # Hardcoded email address
+        password: ${{secrets.MAIL_PASSWORD}}  # Keep the password as a secret!
+        subject: "Debug APK Build Available"
+        to: parthglory2025@gmail.com  # Still sending to your email
+        from: parthglory2025@gmail.com   # Hardcoded email address for sender
+        body: |
+          A new debug APK build is available for testing.
+
+          You can download it from the workflow run page.
+          This link will direct you to the GitHub Action workflow for this build, 
+          where you can download app-debug.apk.
+           Workflow Run URL: ${{ steps.workflow_run_url.outputs.run_url }}
+        secure: true

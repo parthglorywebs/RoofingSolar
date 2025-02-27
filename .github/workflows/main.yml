@@ -1,52 +1,27 @@
-name: Send Test Email to Parthm (Sendinblue)
+name: Send Test Email via SMTP
 
 on:
   push:
-    branches:
-      - dev
+    branches: [dev]
 
 jobs:
-  send-email:
+  send_email:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Send Email Notification
+        uses: hilarion5/send-mail@v1
         with:
-          python-version: '3.9'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install requests
-
-      - name: Send Email via Sendinblue
-        env:
-          SENDINBLUE_API_KEY: ${{ secrets.SENDINBLUE_API_KEY }}  # Store in GitHub Secrets
-          TO_EMAIL: Parthm@glorywebsdev.com
-          FROM_EMAIL: parthglory2025@gmail.com  # MUST BE VERIFIED IN SENDINBLUE!
-          SUBJECT: "GitHub Actions Test Email (To Parthm - Sendinblue)"
-          BODY: "This is a sample test email sent from GitHub Actions to Parthm@glorywebsdev.com using Sendinblue!"
-        run: |
-          python -c "
-          import requests
-          import os
-
-          url = 'https://api.sendinblue.com/v3/smtp/email'
-          headers = {
-              'accept': 'application/json',
-              'content-type': 'application/json',
-              'api-key': os.environ['SENDINBLUE_API_KEY']
-          }
-          data = {
-              'sender': {'email': os.environ['FROM_EMAIL'], 'name': 'GitHub Actions'},
-              'to': [{'email': os.environ['TO_EMAIL']}],
-              'subject': os.environ['SUBJECT'],
-              'htmlContent': f'<p>{os.environ['BODY']}</p>' # Sendinblue wants HTML
-          }
-          response = requests.post(url, headers=headers, json=data)
-          response.raise_for_status()
-          print(f'Email sent! Status code: {response.status_code}, Response: {response.text}')
-          "
+          smtp-server: smtp.gmail.com
+          smtp-port: 587
+          smtp-secure: true
+          from-email: ${{ secrets.MAIL_USERNAME }}
+          to-email: Parthm@glorywebsdev.com
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "Test Email from GitHub Actions 🚀"
+          body: "Hello Parth, this is a test email sent from GitHub Actions!"
+          html: |
+            <h1>Hello Parth 👋</h1>
+            <p>This is a test email sent from <strong>GitHub Actions</strong>.</p>
+            <p><b>SMTP Email Sending is Working ✅</b></p>

@@ -8,7 +8,6 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
@@ -25,27 +24,11 @@ jobs:
       with:
         node-version: '18.x'
 
-    - name: Cache Gradle packages
-      uses: actions/cache@v3
-      with:
-        path: |
-          ~/.gradle/caches
-          ~/.gradle/wrapper
-        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-        restore-keys: |
-          ${{ runner.os }}-gradle-
-
-    - name: Cache Android SDK
-      uses: actions/cache@v3
-      with:
-        path: ~/android/sdk
-        key: ${{ runner.os }}-android-sdk
-        restore-keys: ${{ runner.os }}-android-sdk
-
     - name: Install dependencies
       run: |
         npm install
         cd android
+        ./gradlew clean
 
     - name: Assemble Debug
       run: |
@@ -58,34 +41,15 @@ jobs:
         name: app-debug.apk
         path: android/app/build/outputs/apk/debug/app-debug.apk
 
-    - name: Get Workflow Run URL
-      id: workflow_run_url
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const runId = context.runId;
-          const repo = context.repo.owner + "/" + context.repo.repo;
-          const runURL = `https://github.com/${repo}/actions/runs/${runId}`;
-          core.setOutput('run_url', runURL);
-
-    - name: Send Email with Workflow Run URL
+    - name: Send APK via Email
       uses: dawidd6/action-send-mail@v3
       with:
         server_address: smtp.gmail.com
         server_port: 465
-        username: ${{ secrets.MAIL_USERNAME }} 
-        password: ${{ secrets.MAIL_PASSWORD }} 
-        subject: "New Android Debug APK Build Available"
-        to: parthglory2025@gmail.com
-        from: ${{ secrets.MAIL_USERNAME }}
-        body: |
-          A new Android Debug APK build is available for testing.
-
-          Please follow these steps to download the APK:
-
-          1. Click on the link below to go to the GitHub Actions workflow run page:
-             https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          2. Scroll down to the "Artifacts" section at the bottom of the page.
-          3. Click on "app-debug.apk" to download the APK file.
-
-        secure: true
+        username: ${{ secrets.EMAIL_USERNAME }}
+        password: ${{ secrets.EMAIL_PASSWORD }}
+        subject: "Android Debug APK Build"
+        body: "Hello, \n\nPlease find the attached Debug APK.\n\nRegards,\nGitHub Actions"
+        to: "parthglory2025@gmail.com"
+        from: "parthglory2025@gmail.com"
+        attachments: android/app/build/outputs/apk/debug/app-debug.apk

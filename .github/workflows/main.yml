@@ -18,12 +18,13 @@ jobs:
 
       - name: Send Test Email
         run: |
-          sendEmail -f ${{ "parthglory2025@gmail.com" }} \
-                    -t parthglory2025@gmail.com \
+          sendEmail -f "parthglory2025@gmail.com" \
+                    -t "parthglory2025@gmail.com" \
                     -s smtp.gmail.com:587 \
-                    -xu ${{ "parthglory2025@gmail.com" }} \
-                    -xp "${{ "ktut btyz bnmv xqwo" }}" \
+                    -xu "${{ secrets.MAIL_USERNAME }}" \
+                    -xp "${{ secrets.MAIL_PASSWORD }}" \
                     -o tls=yes \
                     -u "Test Email from GitHub Actions" \
-                    -m "Hello, this is a test email sent from GitHub Actions!"
+                    -m "Hello, this is a test email sent from GitHub Actions!" \
+                    -v  # Verbose mode for debugging
         shell: bash

@@ -1,31 +1,66 @@
-name: Build Android Debug APK and Send Email
+name: CI/CD with Email Notification
 
 on:
   push:
-    branches: [dev]
+    branches: [ "dev" ]  # Or your main branch
   pull_request:
-    branches: [dev]
+    branches: [ "dev" ]
 
 jobs:
-  send_email:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Install sendEmail
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y sendemail
+      - uses: actions/checkout@v4
 
-      - name: Send Test Email
+      - name: Set job status
+        id: job_status
         run: |
-          APP_PASSWORD="ktut btyz bnmv xqwo"
-          sendEmail -f "parthglory2025@gmail.com" \
-                    -t "parthglory2025@gmail.com" \
-                    -s smtp.gmail.com:587 \
-                    -xu "parthglory2025@gmail.com" \
-                    -xp "$APP_PASSWORD" \
-                    -o tls=yes \
-                    -u "Test Email from GitHub Actions" \
-                    -m "Hello, this is a test email sent from GitHub Actions!" \
-                    -v  # Verbose mode for debugging
-        shell: bash
+          if [ "$GITHUB_STATUS" = "success" ]; then
+            echo "status=success" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=failure" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run Tests (Example)
+        run: |
+          # Replace this with your actual build/test steps
+          echo "Running tests..."
+          ./your_test_script.sh  # If you have one
+          # If any test fails, it will cause the workflow to fail
+
+      - name: Send Email Notification
+        uses: dawidd6/action-send-email@v3
+        with:
+          server_address: smtp.example.com  # Replace with your SMTP server address
+          server_port: 587               # Replace with your SMTP server port
+          username: parthm@glorywebsdev.com # Replace with your email address
+          password: ${{ secrets.EMAIL_PASSWORD }} # Store your password securely as a secret
+          subject: 'GitHub Actions Run Report - ${{ github.workflow }}'
+          to: recipient_email@example.com  # Replace with the recipient's email address
+          from: parthm@glorywebsdev.com  # Replace with your email address
+          body: |
+            Hi there,
+
+            This is an automated email from your GitHub Actions workflow.
+
+            * Workflow: ${{ github.workflow }}
+            * Event: ${{ github.event_name }}
+            * Repository: ${{ github.repository }}
+            * Branch: ${{ github.ref_name }}
+            * Commit: ${{ github.sha }}
+            * Run ID: ${{ github.run_id }}
+            * Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            * Status: ${{ job.status }}
+
+            {% if job.status == 'failure' %}
+                **The workflow run FAILED.**  Check the logs for details.
+            {% else %}
+                The workflow run completed successfully.
+            {% endif %}
+
+            Thanks,
+            Your GitHub Actions Bot
+          # Optional: Add attachments if needed
+          # attachments: ./path/to/attachment.txt,./another/attachment.pdf
+        if: always()

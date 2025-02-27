@@ -55,13 +55,13 @@ jobs:
     - name: Send Email with APK Link
       uses: dawidd6/action-send-mail@v3 # Use a dedicated email sending action
       with:
-        server_address: smtp.gmail.com #or outlook.com
-        server_port: 465 #or 587 if your smtp support tls connection
-        username: ${{secrets.MAIL_USERNAME}} # your smtp email address
-        password: ${{secrets.MAIL_PASSWORD}}
+        server_address: smtp.gmail.com
+        server_port: 465
+        username: parthglory2025@gmail.com  # Hardcoded email address
+        password: ${{secrets.MAIL_PASSWORD}}  # Keep the password as a secret!
         subject: "Debug APK Build Available"
-        to: parthglory2025@gmail.com
-        from: ${{secrets.MAIL_USERNAME}}
+        to: parthglory2025@gmail.com  # Still sending to your email
+        from: parthglory2025@gmail.com   # Hardcoded email address for sender
         body: |
           A new debug APK build is available for testing.
 
@@ -69,4 +69,4 @@ jobs:
           This link will direct you to the GitHub Action workflow for this build, 
           where you can download app-debug.apk.
            Workflow Run URL: ${{ steps.workflow_run_url.outputs.run_url }}
-        secure: true #or false if your smtp support tls connection
+        secure: true

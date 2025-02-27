@@ -39,7 +39,7 @@ jobs:
               Messages: [
                 {
                   From: {
-                    Email: "parthm@glorywebsdev.com",  // Replace with your verified sender!
+                    Email: "parthglory2025@gmail.com",  // Replace with your verified sender!
                     Name: "Parth Glory"
                   },
                   To: [

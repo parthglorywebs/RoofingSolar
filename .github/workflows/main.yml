@@ -16,7 +16,7 @@ jobs:
           smtp-port: 587  # Use port 587 for STARTTLS
           smtp-secure: false  # Must be false for STARTTLS
           from-email: ${{ secrets.MAIL_USERNAME }}
-          to-email: Parthm@glorywebsdev.com
+          to-email: "parthglory2025@gmail.com"
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
           subject: "Test Email from GitHub Actions 🚀"

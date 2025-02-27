@@ -73,8 +73,8 @@ jobs:
       with:
         server_address: smtp.gmail.com
         server_port: 465
-        username: ${{ secrets.MAIL_USERNAME }} # Still needed for sending email
-        password: ${{ secrets.MAIL_PASSWORD }} # Still needed for sending email
+        username: ${{ secrets.MAIL_USERNAME }} 
+        password: ${{ secrets.MAIL_PASSWORD }} 
         subject: "New Android Debug APK Build Available"
         to: parthglory2025@gmail.com
         from: ${{ secrets.MAIL_USERNAME }}

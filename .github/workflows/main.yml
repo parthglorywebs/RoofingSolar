@@ -1,9 +1,9 @@
-name: Send Test Email to Parthm
+name: Send Test Email via Sendinblue (Free Plan)
 
 on:
   push:
     branches:
-      - dev  # Trigger on pushes to the 'main' branch
+      - dev
 
 jobs:
   send-email:
@@ -15,40 +15,38 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'  # Or your Python version
+          python-version: '3.9'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install requests
 
-      - name: Send Email via SendGrid
+      - name: Send Email via Sendinblue
         env:
-          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}  # Store in GitHub Secrets
-          TO_EMAIL: Parthm@glorywebsdev.com  # Your email address
-          FROM_EMAIL: your_app@example.com  # IMPORTANT: Replace with a verified "from" email in your SendGrid account!
-          SUBJECT: "GitHub Actions Test Email (To Parthm)"
-          BODY: "This is a test email sent from GitHub Actions to Parthm@glorywebsdev.com!"
+          SENDINBLUE_API_KEY: ${{ secrets.SENDINBLUE_API_KEY }}  # Store in GitHub Secrets
+          TO_EMAIL: Parthm@glorywebsdev.com
+          FROM_EMAIL: your_verified_email@example.com # IMPORTANT:  A verified "from" email in Sendinblue!
+          SUBJECT: "GitHub Actions Test Email (Sendinblue Free)"
+          BODY: "This is a test email sent from GitHub Actions via Sendinblue (free plan)!"
         run: |
           python -c "
           import requests
           import os
 
-          url = 'https://api.sendgrid.com/v3/mail/send'
+          url = 'https://api.sendinblue.com/v3/smtp/email'  # Corrected endpoint
           headers = {
-              'Authorization': f'Bearer {os.environ['SENDGRID_API_KEY']}',
-              'Content-Type': 'application/json'
+              'accept': 'application/json',
+              'content-type': 'application/json',
+              'api-key': os.environ['SENDINBLUE_API_KEY']
           }
           data = {
-              'personalizations': [{
-                  'to': [{'email': os.environ['TO_EMAIL']}]
-              }],
-              'from': {'email': os.environ['FROM_EMAIL']},
+              'sender': {'email': os.environ['FROM_EMAIL'], 'name': 'GitHub Actions'},
+              'to': [{'email': os.environ['TO_EMAIL']}],
               'subject': os.environ['SUBJECT'],
-              'content': [{'type': 'text/plain', 'value': os.environ['BODY']}]
+              'htmlContent': f'<p>{os.environ['BODY']}</p>'  # Sendinblue wants HTML
           }
-
           response = requests.post(url, headers=headers, json=data)
-          response.raise_for_status()  # Raise exception for bad status codes
-          print(f'Email sent! Status code: {response.status_code}')
+          response.raise_for_status()
+          print(f'Email sent! Status code: {response.status_code}, Response: {response.text}')
           "

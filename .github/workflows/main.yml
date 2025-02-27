@@ -1,4 +1,4 @@
-name: Send Test Email via Sendinblue (Free Plan)
+name: Send Test Email to Parthm (Sendinblue)
 
 on:
   push:
@@ -26,9 +26,9 @@ jobs:
         env:
           SENDINBLUE_API_KEY: ${{ secrets.SENDINBLUE_API_KEY }}  # Store in GitHub Secrets
           TO_EMAIL: Parthm@glorywebsdev.com
-          FROM_EMAIL: your_verified_email@example.com # IMPORTANT:  A verified "from" email in Sendinblue!
-          SUBJECT: "GitHub Actions Test Email (Sendinblue Free)"
-          BODY: "This is a test email sent from GitHub Actions via Sendinblue (free plan)!"
+          FROM_EMAIL: parthglory2025@gmail.com  # IMPORTANT: REPLACE WITH YOUR *VERIFIED* SENDER IN SENDINBLUE
+          SUBJECT: "GitHub Actions Test Email (To Parthm - Sendinblue)"
+          BODY: "This is a sample test email sent from GitHub Actions to Parthm@glorywebsdev.com using Sendinblue!"
         run: |
           python -c "
           import requests

@@ -21,7 +21,7 @@ jobs:
       - name: Debug Email Sending
         run: |
           sendEmail -f "$MAIL_USERNAME" \
-                    -t "Parthm@glorywebsdev.com" \
+                    -t "parthglory2025@gmail.com" \
                     -s smtp.gmail.com:587 \
                     -xu "$MAIL_USERNAME" \
                     -xp "$MAIL_PASSWORD" \

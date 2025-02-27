@@ -37,7 +37,7 @@ jobs:
             'Messages': [
               {
                 "From": {
-                  "Email": "your_sender@example.com",
+                  "Email": "parthm@glorywebsdev.com",
                   "Name": "Parth Glory"
                 },
                 "To": [

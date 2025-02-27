@@ -18,7 +18,7 @@ jobs:
           python-version: '3.x'
 
       - name: Install Mailjet SDK
-        run: pip install mailjet_rest
+        run: pip install mailjet_rest requests
 
       - name: Send Email with Mailjet API
         env:
@@ -29,8 +29,12 @@ jobs:
           from mailjet_rest import Client
           import os
 
-          api_key = os.environ.get('MAILJET_API_KEY')
-          api_secret = os.environ.get('MAILJET_SECRET_KEY')
+          api_key = os.getenv('MAILJET_API_KEY')
+          api_secret = os.getenv('MAILJET_SECRET_KEY')
+
+          if not api_key or not api_secret:
+              print("Error: API Key or Secret is missing!")
+              exit(1)
 
           mailjet = Client(auth=(api_key, api_secret), version='v3.1')
           data = {
@@ -53,10 +57,16 @@ jobs:
               }
             ]
           }
+          
           try:
-              result = mailjet.post(path='send', data=data)
-              print(result.status_code)
-              print(result.json())
+              response = mailjet.post("send", data=data)
+              print(f"Status Code: {response.status_code}")
+              print(f"Response: {response.json()}")
+              
+              if response.status_code != 200:
+                  print("Error: Failed to send email.")
+                  exit(1)
           except Exception as e:
               print(f"Error sending email: {e}")
+              exit(1)
           EOF

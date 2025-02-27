@@ -22,8 +22,8 @@ jobs:
 
       - name: Send Email with Mailjet API
         env:
-          MAILJET_API_KEY: ${{ secrets.MAILJET_API_KEY }}  # Your Mailjet API key
-          MAILJET_SECRET_KEY: ${{ secrets.MAILJET_SECRET_KEY }}  # Your Mailjet Secret key
+          MAILJET_API_KEY: ${{ secrets.MAILJET_API_KEY }}  
+          MAILJET_SECRET_KEY: ${{ secrets.MAILJET_SECRET_KEY }}  
         run: |
           python <<EOF
           from mailjet_rest import Client

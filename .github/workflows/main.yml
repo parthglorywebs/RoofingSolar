@@ -14,14 +14,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y sendemail libio-socket-ssl-perl libnet-ssleay-perl
 
-      - name: Send Test Email via SMTP
+      - name: Send Email Notification
         run: |
-          sendEmail -f "${{ secrets.MAIL_USERNAME }}" \
-                    -t "recipient@example.com" \
-                    -s smtp.gmail.com:587 \
-                    -xu "${{ secrets.MAIL_USERNAME }}" \
-                    -xp "${{ secrets.MAIL_PASSWORD }}" \
-                    -o tls=yes \
-                    -u "Test Email from GitHub Actions" \
-                    -m "Hello, this is a test email!"
+          sendEmail -f "***" \
+            -t "***" \
+            -s smtp.gmail.com:587 \
+            -xu "${{secrets.MAIL_USERNAME}}" \
+            -xp "${{secrets.MAIL_PASSWORD}}" \
+            -o tls=yes \
+            -u "Test Email from GitHub Actions" \
+            -m "Hello, this is a test email!"
         shell: bash

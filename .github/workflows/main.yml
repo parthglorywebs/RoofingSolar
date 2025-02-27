@@ -2,9 +2,9 @@ name: Build Android Debug APK
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, dev ]  #  <-- Added the 'dev' branch
   pull_request:
-    branches: [ main ]
+    branches: [ main, dev ]  #  <-- Added the 'dev' branch
 
 jobs:
   build:

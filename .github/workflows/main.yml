@@ -14,11 +14,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y sendemail libio-socket-ssl-perl libnet-ssleay-perl
 
+      - name: Test DNS Resolution
+        run: |
+          nslookup smtp.gmail.com
+
       - name: Send Email Notification
         env:
           MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
           MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
         run: |
+          echo "Sending email from: $MAIL_USERNAME" # Diagnostic output
+          sleep 5 #Give time for all dependencies to install.
           sendEmail -f "$MAIL_USERNAME" \
                     -t "Parthm@glorywebsdev.com" \
                     -s smtp.gmail.com:587 \

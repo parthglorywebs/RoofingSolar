@@ -7,66 +7,23 @@ on:
     branches: [ dev ]
 
 jobs:
-  build:
-
+  send_email:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+      - name: Install sendEmail
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sendemail
 
-    - name: Set up JDK 17
-      uses: actions/setup-java@v3
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18.x'
-
-    - name: Install dependencies
-      run: |
-        npm install
-        cd android
-        ./gradlew clean
-
-    - name: Assemble Debug
-      run: |
-        cd android
-        ./gradlew assembleDebug
-
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: app-debug.apk
-        path: android/app/build/outputs/apk/debug/app-debug.apk
-
-    - name: Get Workflow Run URL
-      id: workflow_run_url
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const runId = context.runId;
-          const repo = context.repo.owner + "/" + context.repo.repo;
-          const runURL = `https://github.com/${repo}/actions/runs/${runId}`;
-          core.setOutput('run_url', runURL);
-
-    - name: Send Email with APK Link
-      uses: dawidd6/action-send-mail@v3 # Use a dedicated email sending action
-      with:
-        server_address: smtp.gmail.com #or outlook.com
-        server_port: 465 #or 587 if your smtp support tls connection
-        username: ${{secrets.MAIL_USERNAME}} # your smtp email address
-        password: ${{secrets.MAIL_PASSWORD}}
-        subject: "Debug APK Build Available"
-        to: parthglory2025@gmail.com
-        from: ${{secrets.MAIL_USERNAME}}
-        body: |
-          A new debug APK build is available for testing.
-
-          You can download it from the workflow run page.
-          This link will direct you to the GitHub Action workflow for this build, 
-          where you can download app-debug.apk.
-           Workflow Run URL: ${{ steps.workflow_run_url.outputs.run_url }}
-        secure: true #or false if your smtp support tls connection
+      - name: Send Test Email via SMTP
+        run: |
+          sendEmail -f "${{ secrets.MAIL_USERNAME }}" \
+                    -t "recipient@example.com" \
+                    -s smtp.gmail.com:587 \
+                    -xu "${{ secrets.MAIL_USERNAME }}" \
+                    -xp "${{ secrets.MAIL_PASSWORD }}" \
+                    -o tls=yes \
+                    -u "Test Email from GitHub Actions" \
+                    -m "Hello, this is a test email!"
+        shell: bash

@@ -1,72 +1,88 @@
-name: Send Test Email via Mailjet API
+name: Send Email via Mailjet API (Complete)
 
 on:
   push:
-    branches: [dev]
+    branches: [dev]  # Trigger on pushes to the 'dev' branch (adjust as needed)
 
 jobs:
-  send_email:
+  build:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.x
+      - name: Set up Python 3.9 (Specific Version)
         uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
+          python-version: '3.9'  # Use a specific Python version
 
-      - name: Install Mailjet SDK
-        run: pip install mailjet_rest requests
+      - name: Install Dependencies
+        run: pip install mailjet_rest  # Install the Mailjet library
 
       - name: Send Email with Mailjet API
+        id: send_email  # Assign an ID to this step for conditional checking
         env:
-          MAILJET_API_KEY: ${{ secrets.MAILJET_API_KEY }}  
-          MAILJET_SECRET_KEY: ${{ secrets.MAILJET_SECRET_KEY }}  
+          MAILJET_API_KEY: ${{ secrets.MAILJET_API_KEY }}  # Access API key from secrets
+          MAILJET_SECRET_KEY: ${{ secrets.MAILJET_SECRET_KEY }}  # Access secret key from secrets
         run: |
           python <<EOF
-          from mailjet_rest import Client
           import os
+          from mailjet_rest import Client
+          import json
 
-          api_key = os.getenv('MAILJET_API_KEY')
-          api_secret = os.getenv('MAILJET_SECRET_KEY')
-
-          if not api_key or not api_secret:
-              print("Error: API Key or Secret is missing!")
-              exit(1)
+          api_key = os.environ.get('MAILJET_API_KEY')
+          api_secret = os.environ.get('MAILJET_SECRET_KEY')
+          sender_email = "parthm@glorywebsdev.com"  # Replace with your verified sender
 
           mailjet = Client(auth=(api_key, api_secret), version='v3.1')
           data = {
-            'Messages': [
-              {
-                "From": {
-                  "Email": "parthm@glorywebsdev.com",
-                  "Name": "Parth Glory"
-                },
-                "To": [
+              'Messages': [
                   {
-                    "Email": "parthglory2025@gmail.com",
-                    "Name": "Parth Glory"
+                      "From": {
+                          "Email": sender_email,
+                          "Name": "Parth Glory"
+                      },
+                      "To": [
+                          {
+                              "Email": "parthglory2025@gmail.com",
+                              "Name": "Parth Glory"
+                          }
+                      ],
+                      "Subject": "GitHub Actions Notification",
+                      "TextPart": "This email was sent by GitHub Actions.",
+                      "HTMLPart": "<h3>This email was sent by GitHub Actions!</h3>",
                   }
-                ],
-                "Subject": "Greetings from Mailjet.",
-                "TextPart": "My first Mailjet email",
-                "HTMLPart": "<h3>Dear Parth Glory, welcome to Mailjet!</h3><br />May the delivery force be with you!",
-                "CustomID": "AppGettingStartedTest"
-              }
-            ]
+              ]
           }
-          
           try:
-              response = mailjet.post("send", data=data)
-              print(f"Status Code: {response.status_code}")
-              print(f"Response: {response.json()}")
-              
-              if response.status_code != 200:
-                  print("Error: Failed to send email.")
-                  exit(1)
+              result = mailjet.post(path='send', data=data)
+              status_code = result.status_code
+              response_json = result.json()
+
+              print(f"Mailjet API Status Code: {status_code}")
+              print(f"Mailjet API Response: {json.dumps(response_json, indent=2)}")  # Pretty print JSON
+
+              if status_code == 200 or status_code == 201:
+                  print("::set-output name=email_sent::true")  # Set output for conditional checking
+                  print("Email sent successfully!")
+              else:
+                  print("::set-output name=email_sent::false")  # Indicate failure
+                  print(f"Email sending failed with status code: {status_code}")
+                  print(f"Error details: {json.dumps(response_json, indent=2)}")
+                  raise Exception(f"Mailjet API error: {status_code} - {json.dumps(response_json)}")
+
           except Exception as e:
-              print(f"Error sending email: {e}")
-              exit(1)
+              print(f"::error title=Mailjet Send Error::Failed to send email: {e}") #Proper Error message for Actions panel.
+              print("::set-output name=email_sent::false")  # Ensure failure is indicated
+
           EOF
+
+      # Example: Send a success/failure notification based on the email sending status
+      - name: Send Notification (Example, Optional)
+        if: steps.send_email.outputs.email_sent == 'true'  # Condition: only if the email was sent successfully
+        run: echo "Email was sent successfully. You can add further actions here."
+
+      - name: Send Failure Notification (Example, Optional)
+        if: steps.send_email.outputs.email_sent == 'false'  # Condition: only if the email failed to send
+        run: echo "Email sending failed. Check the logs for details."

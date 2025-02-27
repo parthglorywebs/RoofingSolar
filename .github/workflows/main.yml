@@ -17,7 +17,7 @@ jobs:
       - name: Send Test Email via SMTP
         run: |
           sendEmail -f "${{ secrets.MAIL_USERNAME }}" \
-                    -t "Parthm@glorywebsdev.com" \
+                    -t "recipient@example.com" \
                     -s smtp.gmail.com:587 \
                     -xu "${{ secrets.MAIL_USERNAME }}" \
                     -xp "${{ secrets.MAIL_PASSWORD }}" \

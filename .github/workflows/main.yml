@@ -1,4 +1,4 @@
-name: Send Test Email via SMTP
+name: Send Test Email via Mailjet API
 
 on:
   push:
@@ -9,24 +9,54 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Install Required Dependencies (Fix TLS)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y sendemail libio-socket-ssl-perl libnet-ssleay-perl
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Test DNS Resolution
-        run: |
-          nslookup smtp.gmail.com
+      - name: Set up Python 3.x
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
 
-      - name: Debug Email Sending
+      - name: Install Mailjet SDK
+        run: pip install mailjet_rest
+
+      - name: Send Email with Mailjet API
+        env:
+          MAILJET_API_KEY: ${{ secrets.MAILJET_API_KEY }}  # Your Mailjet API key
+          MAILJET_SECRET_KEY: ${{ secrets.MAILJET_SECRET_KEY }}  # Your Mailjet Secret key
         run: |
-          sendEmail -f "$MAIL_USERNAME" \
-                    -t "parthglory2025@gmail.com" \
-                    -s smtp.gmail.com:587 \
-                    -xu "$MAIL_USERNAME" \
-                    -xp "$MAIL_PASSWORD" \
-                    -o tls=auto \
-                    -u "Debug Test Email" \
-                    -m "This is a debug test email!" \
-                    -v -v -v  # Enable verbose mode
-        shell: bash
+          python <<EOF
+          from mailjet_rest import Client
+          import os
+
+          api_key = os.environ.get('MAILJET_API_KEY')
+          api_secret = os.environ.get('MAILJET_SECRET_KEY')
+
+          mailjet = Client(auth=(api_key, api_secret), version='v3.1')
+          data = {
+            'Messages': [
+              {
+                "From": {
+                  "Email": "your_sender@example.com",
+                  "Name": "Parth Glory"
+                },
+                "To": [
+                  {
+                    "Email": "parthglory2025@gmail.com",
+                    "Name": "Parth Glory"
+                  }
+                ],
+                "Subject": "Greetings from Mailjet.",
+                "TextPart": "My first Mailjet email",
+                "HTMLPart": "<h3>Dear Parth Glory, welcome to Mailjet!</h3><br />May the delivery force be with you!",
+                "CustomID": "AppGettingStartedTest"
+              }
+            ]
+          }
+          try:
+              result = mailjet.post(path='send', data=data)
+              print(result.status_code)
+              print(result.json())
+          except Exception as e:
+              print(f"Error sending email: {e}")
+          EOF

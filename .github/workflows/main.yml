@@ -1,7 +1,10 @@
-name: Send Test Email
+name: Build Android Debug APK and Send Email
 
 on:
-  workflow_dispatch:  # This allows manual triggering of the workflow
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [dev]
 
 jobs:
   send_email:

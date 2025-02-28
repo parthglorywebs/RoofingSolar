@@ -22,12 +22,12 @@ jobs:
 
       - name: Send Email with Brevo SMTP
         env:
-          BREVO_HOST: smtp-relay.brevo.com
+          BREVO_HOST: "smtp-relay.brevo.com"
           BREVO_PORT: 587
-          BREVO_USERNAME: 86daf4001@smtp-brevo.com
-          BREVO_PASSWORD: 9HUFhqYPs4xgNJAc
-          RECIPIENT_EMAIL: parthglory2025@gmail.com  # For testing
-          SENDER_EMAIL: your_verified_sender@example.com  # Verified Sender in Brevo
+          BREVO_USERNAME: "86daf4001@smtp-brevo.com"
+          BREVO_PASSWORD: "9HUFhqYPs4xgNJAc"
+          RECIPIENT_EMAIL: "parthglory2025@gmail.com"  # For testing
+          SENDER_EMAIL: "parthglory2025@gmail.com"  # Verified Sender in Brevo
         run: |
           node <<EOF
           const nodemailer = require('nodemailer');

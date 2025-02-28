@@ -16,7 +16,7 @@ jobs:
         env:
           MAILTRAP_USERNAME: ${{ secrets.MAILTRAP_USERNAME }}
           MAILTRAP_PASSWORD: ${{ secrets.MAILTRAP_PASSWORD }}
-          RECIPIENT_EMAIL: parthm@glorywebsdev.com  # Or parthglory2025@gmail.com for testing
+          RECIPIENT_EMAIL: "parthglory2025@gmail.com"  # Or parthglory2025@gmail.com for testing
         run: |
           echo 'Looking to send emails in production? Check out our Email API/SMTP product!'
           curl \

@@ -8,6 +8,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    outputs:
+      artifact_url: ${{ steps.get_artifact_url.outputs.artifact_url }}
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -17,36 +20,33 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+          cache: gradle # Enable Java caching
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18.x'
+          cache: 'npm'  # Cache npm packages
 
-      - name: Cache Gradle Dependencies
+      - name: Restore Gradle Cache
         uses: actions/cache@v3
         with:
-          path: ~/.gradle/caches
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
           key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/*.kt', '**/*.java') }}
-          restore-keys: gradle-${{ runner.os }}-
-
-      - name: Cache Node Modules
-        uses: actions/cache@v3
-        with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: node-modules-${{ runner.os }}-
+          restore-keys: |
+            gradle-${{ runner.os }}-
+            gradle-
 
       - name: Install dependencies
         run: |
           npm install
-          cd android
-          ./gradlew clean
 
       - name: Assemble Debug APK
         run: |
           cd android
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --stacktrace # Add --stacktrace for more verbose logging
 
       - name: Upload APK as Artifact
         uses: actions/upload-artifact@v4
@@ -55,14 +55,35 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 7
 
+      - name: Get Artifact Download URL
+        id: get_artifact_url
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }} # Use the default GITHUB_TOKEN, ensure it has read permissions
+          script: |
+            const artifacts = await github.rest.actions.listArtifactsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+
+            const artifact = artifacts.data.artifacts.find(artifact => artifact.name === 'app-debug');
+
+            if (!artifact) {
+              console.log('No artifact found with name app-debug');
+              core.setOutput('artifact_url', ''); // Return empty string instead of failing
+              return;
+            }
+
+            // Construct the download URL for the artifact
+            const url = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}/artifacts/${artifact.id}`;
+            core.setOutput('artifact_url', url);
+
   send_email:
     needs: build
     runs-on: ubuntu-latest
+    if: needs.build.outputs.artifact_url != ''
 
     steps:
-      - name: Get Workflow Run URL
-        run: echo "RUN_URL=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_ENV
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -79,6 +100,7 @@ jobs:
           BREVO_PASSWORD: ${{ secrets.BREVO_PASSWORD }}
           RECIPIENT_EMAIL: "parthglory2025@gmail.com"
           SENDER_EMAIL: "parthglory2025@gmail.com"
+          ARTIFACT_URL: ${{ needs.build.outputs.artifact_url }}
         run: |
           node <<EOF
           const nodemailer = require('nodemailer');
@@ -97,7 +119,7 @@ jobs:
               }
             });
 
-            let downloadLink = process.env.RUN_URL;
+            let downloadLink = process.env.ARTIFACT_URL;
             
             let info = await transporter.sendMail({
               from: \`"GitHub Actions" <\${process.env.SENDER_EMAIL}>\`,
@@ -121,3 +143,6 @@ jobs:
             process.exit(1);
           });
           EOF
+    permissions:
+      actions: read
+      contents: read

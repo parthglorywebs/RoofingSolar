@@ -1,63 +1,62 @@
-name: Build Debug APK and Send Email via Brevo
+name: Send Test Email via Brevo (Node.js)
 
 on:
   push:
-    branches: [dev]
+    branches: [dev]  # Trigger on pushes to the 'dev' branch
 
 jobs:
-  build:
+  send_email:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v3
-        with:
-          java-version: '17'
-          distribution: 'temurin'
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18.x'
+          node-version: '18'  # Specific Node.js version for consistency
 
-      - name: Install CMake and Ninja
+      - name: Install Dependencies
+        run: npm install nodemailer
+
+      - name: Send Email with Brevo SMTP
+        env:
+          BREVO_HOST: "smtp-relay.brevo.com"
+          BREVO_PORT: 587
+          BREVO_USERNAME: "86daf4001@smtp-brevo.com"
+          BREVO_PASSWORD: "9HUFhqYPs4xgNJAc"
+          RECIPIENT_EMAIL: "parthglory2025@gmail.com"  # For testing
+          SENDER_EMAIL: "parthglory2025@gmail.com"  # Verified Sender in Brevo
         run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake ninja-build
-
-      - name: Cache Gradle Dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.gradle/caches
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/*.kt', '**/*.java') }}
-          restore-keys: gradle-${{ runner.os }}-
-
-      - name: Cache Node Modules
-        uses: actions/cache@v3
-        with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: node-modules-${{ runner.os }}-
-
-      - name: Install dependencies
-        run: |
-          npm install
-          npm install react-native-gesture-handler@latest
-          cd android
-          rm -rf ~/.gradle/caches
-          ./gradlew clean
-
-      - name: Assemble Debug APK
-        run: |
-          cd android
-          ./gradlew assembleDebug --stacktrace
-
-      - name: Upload APK as Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 7
+          node <<EOF
+          const nodemailer = require('nodemailer');
+          async function main() {
+            let transporter = nodemailer.createTransport({
+              host: process.env.BREVO_HOST,
+              port: process.env.BREVO_PORT,
+              secure: false, // upgrade later with STARTTLS
+              auth: {
+                user: process.env.BREVO_USERNAME,
+                pass: process.env.BREVO_PASSWORD,
+              },
+              tls: {
+                ciphers:'SSLv3',
+                rejectUnauthorized: false // Only for testing, remove for production
+              }
+            });
+            let info = await transporter.sendMail({
+              from: \`"GitHub Actions Test" <\${process.env.SENDER_EMAIL}>\`,
+              to: process.env.RECIPIENT_EMAIL,
+              subject: "Brevo SMTP Test from GitHub Actions",
+              text: "This is a test email sent via Brevo SMTP from GitHub Actions.",
+              html: "<h3>This is a test email sent via Brevo SMTP from GitHub Actions.</h3>",
+            });
+            console.log("✅ Message sent: %s", info.messageId);
+            //console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info)); // For Ethereal Accounts
+          }
+          main().catch((error) => {
+            console.error("❌ Error sending email:", error);
+            process.exit(1);
+          });
+          EOF

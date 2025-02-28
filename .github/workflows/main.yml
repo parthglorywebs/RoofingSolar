@@ -1,71 +1,41 @@
-name: Build and Send Android Debug APK
+name: Send Test Email via Brevo (Node.js)
 
 on:
   push:
-    branches: [dev]
-  pull_request:
-    branches: [dev]
+    branches: [dev]  # Trigger on pushes to the 'dev' branch
 
 jobs:
-  build_and_send:
+  send_email:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v3
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18.x'
+          node-version: '18'  # Specific Node.js version for consistency
 
-      - name: Install Android dependencies and Build
-        run: |
-          npm install
-          cd android
-          ./gradlew clean
-          ./gradlew assembleDebug
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-debug.apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-
-      - name: Download APK
-        uses: actions/download-artifact@v4
-        with:
-          name: app-debug.apk
-          path: . # Downloads to the root directory.  Important for the attachment
-
-      - name: Install Nodemailer and Mime-Types
-        run: npm install nodemailer mime-types
+      - name: Install Dependencies
+        run: npm install nodemailer
 
       - name: Send Email with Brevo SMTP
         env:
           BREVO_HOST: "smtp-relay.brevo.com"
           BREVO_PORT: 587
-          BREVO_USERNAME: "YOUR_BREVO_USERNAME" # Replace placeholders
-          BREVO_PASSWORD: "YOUR_BREVO_PASSWORD" # Replace placeholders
-          RECIPIENT_EMAIL: "bhagyesh.glorywebsdev@gmail.com"
-          SENDER_EMAIL: "parthglory2025@gmail.com"
+          BREVO_USERNAME: "86daf4001@smtp-brevo.com"
+          BREVO_PASSWORD: "9HUFhqYPs4xgNJAc"
+          RECIPIENT_EMAIL: "bhagyesh.glorywebsdev@gmail.com"  # For testing
+          SENDER_EMAIL: "parthglory2025@gmail.com"  # Verified Sender in Brevo
         run: |
           node <<EOF
           const nodemailer = require('nodemailer');
-          const fs = require('fs');
-          const mime = require('mime-types');
-
           async function main() {
             let transporter = nodemailer.createTransport({
               host: process.env.BREVO_HOST,
               port: process.env.BREVO_PORT,
-              secure: false,
+              secure: false, // upgrade later with STARTTLS
               auth: {
                 user: process.env.BREVO_USERNAME,
                 pass: process.env.BREVO_PASSWORD,
@@ -75,29 +45,15 @@ jobs:
                 rejectUnauthorized: false // Only for testing, remove for production
               }
             });
-
-            // Read the APK file
-            const apkPath = './app-debug.apk';
-            const attachment = fs.readFileSync(apkPath);
-            const attachmentType = mime.lookup(apkPath) || 'application/octet-stream';  // Determine MIME type, default to binary
-
             let info = await transporter.sendMail({
               from: \`"GitHub Actions Test" <\${process.env.SENDER_EMAIL}>\`,
               to: process.env.RECIPIENT_EMAIL,
-              subject: "Debug APK from GitHub Actions",
-              text: "Please find the latest debug APK attached.",
-              html: "<p>Please find the latest debug APK attached.</p>",
-              attachments: [
-                {
-                  filename: 'app-debug.apk',
-                  content: attachment,
-                  contentType: attachmentType,
-                },
-              ],
+              subject: "Brevo SMTP Test from GitHub Actions",
+              text: "This is a test email sent via Brevo SMTP from GitHub Actions.",
+              html: "<h3>This is a test email sent via SMTP from GitHub Actions.</h3>",
             });
-
             console.log("✅ Message sent: %s", info.messageId);
-
+            //console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info)); // For Ethereal Accounts
           }
           main().catch((error) => {
             console.error("❌ Error sending email:", error);

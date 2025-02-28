@@ -1,10 +1,8 @@
-
-
 name: Send Test Email via Mailjet API (Node.js)
 
 on:
   push:
-    branches: [dev]  # Trigger on pushes to the 'dev' branch
+    branches: [dev]  # Trigger on pushes to the 'dev' branch (adjust as needed)
 
 jobs:
   send_email:
@@ -17,15 +15,15 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'  # Specific Node.js version for consistency
+          node-version: '18.x'  # Use a specific Node.js version
 
       - name: Install Dependencies
-        run: npm install node-mailjet
+        run: npm install node-mailjet  # Install the Mailjet Node.js library
 
       - name: Send Email with Mailjet API
         env:
-          MJ_APIKEY_PUBLIC: ${{ secrets.MAILJET_API_KEY }}
-          MJ_APIKEY_PRIVATE: ${{ secrets.MAILJET_SECRET_KEY }}
+          MJ_APIKEY_PUBLIC: ${{ secrets.MAILJET_API_KEY }}  # Your Mailjet API key
+          MJ_APIKEY_PRIVATE: ${{ secrets.MAILJET_SECRET_KEY }}  # Your Mailjet Secret key
         run: |
           node <<EOF
           const Mailjet = require('node-mailjet');
@@ -41,12 +39,12 @@ jobs:
               Messages: [
                 {
                   From: {
-                    Email: "parthglory2025@gmail.com",  // **IMPORTANT: MUST BE VERIFIED IN MAILJET**
+                    Email: "parthm@glorywebsdev.com",  // Replace with your verified sender!
                     Name: "Parth Glory"
                   },
                   To: [
                     {
-                      Email: "parthm@glorywebsdev.com",
+                      Email: "parthglory2025@gmail.com",
                       Name: "Parth Glory"
                     }
                   ],
@@ -60,11 +58,11 @@ jobs:
           request
             .then((result) => {
               console.log("Email sent successfully!");
-              console.log(JSON.stringify(result.body, null, 2));  // Log the response body with formatting
+              console.log(result.body);  // Log the response body
             })
             .catch((err) => {
               console.error("Error sending email:");
-              console.error("Status Code:", err.statusCode);
-              console.error("Complete Error:", err); // Log the entire error object
+              console.error(err.statusCode); // Log the status code
+              console.error(err);            //Log the complete error message
             });
           EOF

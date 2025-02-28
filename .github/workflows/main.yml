@@ -1,85 +1,36 @@
-name: Build Android Debug APK and Send Email via Brevo
-
-permissions:
-  actions: read
-  contents: read  # Required if you use actions/checkout@v4
+name: Send Test Email via Brevo (Node.js)
 
 on:
   push:
-    branches: [dev]
-  pull_request:
-    branches: [dev]
+    branches: [dev]  # Trigger on pushes to the 'dev' branch
 
 jobs:
-  build_and_email:
+  send_email:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v3
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18.x'
+          node-version: '18'  # Specific Node.js version for consistency
 
-      - name: Install dependencies
-        run: |
-          npm install
-          cd android
-          ./gradlew clean
-
-      - name: Assemble Debug APK
-        run: |
-          cd android
-          ./gradlew assembleDebug
-
-      - name: Upload APK
-        id: upload-apk
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-debug.apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-
-      - name: Get Artifact Download URL
-        id: get-artifact-url
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              run_id: context.runId,
-            });
-
-            const artifact = artifacts.data.artifacts.find(a => a.name === 'app-debug.apk');
-
-            if (!artifact) {
-              core.setFailed('Artifact app-debug.apk not found');
-              return;
-            }
-
-            const downloadUrl = `${artifact.url}&expiry-seconds=600`; // URL is valid for 10 minutes
-            core.setOutput('download_url', downloadUrl);
+      - name: Install Dependencies
+        run: npm install nodemailer
 
       - name: Send Email with Brevo SMTP
         env:
           BREVO_HOST: "smtp-relay.brevo.com"
           BREVO_PORT: 587
-          BREVO_USERNAME: "86daf4001@smtp-brevo.com"  # Hardcoded - DO NOT COMMIT PUBLICLY
-          BREVO_PASSWORD: "9HUFhqYPs4xgNJAc" # Hardcoded - DO NOT COMMIT PUBLICLY
-          RECIPIENT_EMAIL: "parthglory2025@gmail.com"  # Hardcoded - DO NOT COMMIT PUBLICLY
-          SENDER_EMAIL: "parthglory2025@gmail.com" # Hardcoded - DO NOT COMMIT PUBLICLY (Verified in Brevo)
+          BREVO_USERNAME: "86daf4001@smtp-brevo.com"
+          BREVO_PASSWORD: "9HUFhqYPs4xgNJAc"
+          RECIPIENT_EMAIL: "parthglory2025@gmail.com"  # For testing
+          SENDER_EMAIL: "parthglory2025@gmail.com"  # Verified Sender in Brevo
         run: |
           node <<EOF
           const nodemailer = require('nodemailer');
-
           async function main() {
             let transporter = nodemailer.createTransport({
               host: process.env.BREVO_HOST,
@@ -94,23 +45,16 @@ jobs:
                 rejectUnauthorized: false // Only for testing, remove for production
               }
             });
-
             let info = await transporter.sendMail({
-              from: \`"GitHub Actions Bot" <\${process.env.SENDER_EMAIL}>\`,
+              from: \`"GitHub Actions Test" <\${process.env.SENDER_EMAIL}>\`,
               to: process.env.RECIPIENT_EMAIL,
-              subject: "Debug APK Build Available",
-              html: \`
-                <h3>A new debug APK build is available for testing.</h3>
-                <p>You can download it using the following link:</p>
-                <a href="\${{ steps.get-artifact-url.outputs.download_url }}">Download app-debug.apk</a>
-                <p>The link will be valid for 10 minutes.</p>
-              \`,
-              text: \`A new debug APK build is available for testing.  You can download it using the following link: ${{ steps.get-artifact-url.outputs.download_url }}  The link will be valid for 10 minutes.\`,
+              subject: "Brevo SMTP Test from GitHub Actions",
+              text: "This is a test email sent via Brevo SMTP from GitHub Actions.",
+              html: "<h3>This is a test email sent via Brevo SMTP from GitHub Actions.</h3>",
             });
-
             console.log("✅ Message sent: %s", info.messageId);
+            //console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info)); // For Ethereal Accounts
           }
-
           main().catch((error) => {
             console.error("❌ Error sending email:", error);
             process.exit(1);

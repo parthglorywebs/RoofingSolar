@@ -1,33 +1,50 @@
-name: Send Test Email via Brevo (Node.js)
+name: Build and Send APK
 
 on:
   push:
     branches: [dev]  # Trigger on pushes to the 'dev' branch
 
 jobs:
-  send_email:
+  build_apk:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'  # Specific Node.js version for consistency
+          node-version: '18'
 
       - name: Install Dependencies
-        run: npm install nodemailer
+        run: npm install
 
-      - name: Send Email with Brevo SMTP
+      - name: Install Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease
+
+      - name: Upload APK to Transfer.sh
+        run: |
+          APK_PATH=$(find android/app/build/outputs/apk/release/ -name "*.apk" | head -n 1)
+          UPLOAD_URL=$(curl --upload-file $APK_PATH https://transfer.sh/$(basename $APK_PATH))
+          echo "APK_LINK=$UPLOAD_URL" >> $GITHUB_ENV
+          echo "✅ APK Uploaded: $UPLOAD_URL"
+
+      - name: Send Email with APK Link
         env:
           BREVO_HOST: "smtp-relay.brevo.com"
           BREVO_PORT: 587
           BREVO_USERNAME: "86daf4001@smtp-brevo.com"
           BREVO_PASSWORD: "9HUFhqYPs4xgNJAc"
-          RECIPIENT_EMAIL: "parthglory2025@gmail.com"  # For testing
-          SENDER_EMAIL: "parthglory2025@gmail.com"  # Verified Sender in Brevo
+          RECIPIENT_EMAIL: "parthglory2025@gmail.com"
+          SENDER_EMAIL: "parthglory2025@gmail.com"
+          APK_LINK: ${{ env.APK_LINK }}
         run: |
           node <<EOF
           const nodemailer = require('nodemailer');
@@ -36,28 +53,26 @@ jobs:
             let transporter = nodemailer.createTransport({
               host: process.env.BREVO_HOST,
               port: process.env.BREVO_PORT,
-              secure: false, // upgrade later with STARTTLS
+              secure: false,
               auth: {
                 user: process.env.BREVO_USERNAME,
                 pass: process.env.BREVO_PASSWORD,
               },
               tls: {
-                ciphers:'SSLv3',
-                rejectUnauthorized: false // Only for testing, remove for production
+                ciphers: 'SSLv3',
+                rejectUnauthorized: false
               }
             });
 
             let info = await transporter.sendMail({
-              from: \`"GitHub Actions Test" <\${process.env.SENDER_EMAIL}>\`,
+              from: \`"GitHub Actions" <\${process.env.SENDER_EMAIL}>\`,
               to: process.env.RECIPIENT_EMAIL,
-              subject: "Brevo SMTP Test from GitHub Actions",
-              text: "This is a test email sent via Brevo SMTP from GitHub Actions.",
-              html: "<h3>This is a test email sent via Brevo SMTP from GitHub Actions.</h3>",
+              subject: "Your APK is Ready!",
+              text: \`Download your APK here: \${process.env.APK_LINK}\`,
+              html: \`<p>Your APK is ready! Click below to download:</p><a href="\${process.env.APK_LINK}">\${process.env.APK_LINK}</a>\`,
             });
 
-            console.log("✅ Message sent: %s", info.messageId);
-            //console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info)); // For Ethereal Accounts
-
+            console.log("✅ Email sent: %s", info.messageId);
           }
 
           main().catch((error) => {

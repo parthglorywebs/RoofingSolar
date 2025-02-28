@@ -1,33 +1,85 @@
-name: Send Test Email via Brevo (Node.js)
+name: Build Debug APK and Send Email via Brevo
 
 on:
   push:
-    branches: [dev]  # Trigger on pushes to the 'dev' branch
+    branches: [dev]  # Trigger on pushes to 'dev' branch
 
 jobs:
-  send_email:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'  # Specific Node.js version for consistency
+          node-version: '18.x'
 
-      - name: Install Dependencies
+      - name: Cache Gradle Dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.gradle/caches
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/*.kt', '**/*.java') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Cache Node Modules
+        uses: actions/cache@v3
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: node-modules-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: |
+          npm install
+          cd android
+          ./gradlew clean
+
+      - name: Assemble Debug APK
+        run: |
+          cd android
+          ./gradlew assembleDebug
+
+      - name: Upload APK as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
+
+  send_email:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get Artifact Download URL
+        id: get_artifact_url
+        run: echo "ARTIFACT_URL=https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_ENV
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+
+      - name: Install Nodemailer
         run: npm install nodemailer
 
-      - name: Send Email with Brevo SMTP
+      - name: Send Email with APK Link via Brevo SMTP
         env:
           BREVO_HOST: "smtp-relay.brevo.com"
           BREVO_PORT: 587
-          BREVO_USERNAME: "86daf4001@smtp-brevo.com"
-          BREVO_PASSWORD: "9HUFhqYPs4xgNJAc"
-          RECIPIENT_EMAIL: "parthglory2025@gmail.com"  # For testing
-          SENDER_EMAIL: "parthglory2025@gmail.com"  # Verified Sender in Brevo
+          BREVO_USERNAME: ${{ secrets.BREVO_USERNAME }}
+          BREVO_PASSWORD: ${{ secrets.BREVO_PASSWORD }}
+          RECIPIENT_EMAIL: "parthglory2025@gmail.com"
+          SENDER_EMAIL: "parthglory2025@gmail.com"
         run: |
           node <<EOF
           const nodemailer = require('nodemailer');
@@ -35,26 +87,36 @@ jobs:
             let transporter = nodemailer.createTransport({
               host: process.env.BREVO_HOST,
               port: process.env.BREVO_PORT,
-              secure: false, // upgrade later with STARTTLS
+              secure: false,
               auth: {
                 user: process.env.BREVO_USERNAME,
                 pass: process.env.BREVO_PASSWORD,
               },
               tls: {
                 ciphers:'SSLv3',
-                rejectUnauthorized: false // Only for testing, remove for production
+                rejectUnauthorized: false
               }
             });
+
+            let downloadLink = process.env.ARTIFACT_URL;
+            
             let info = await transporter.sendMail({
-              from: \`"GitHub Actions Test" <\${process.env.SENDER_EMAIL}>\`,
+              from: \`"GitHub Actions" <\${process.env.SENDER_EMAIL}>\`,
               to: process.env.RECIPIENT_EMAIL,
-              subject: "Brevo SMTP Test from GitHub Actions",
-              text: "This is a test email sent via Brevo SMTP from GitHub Actions.",
-              html: "<h3>This is a test email sent via Brevo SMTP from GitHub Actions.</h3>",
+              subject: "✅ Debug APK Build Available",
+              text: "A new Debug APK is available. Download here: " + downloadLink,
+              html: \`
+                <h3>🚀 New Debug APK Available</h3>
+                <p>You can download the latest debug APK by clicking the link below:</p>
+                <a href="\${downloadLink}" style="font-size:18px; font-weight:bold; color: #0366d6;">Download APK</a>
+                <br><br>
+                <p>Best Regards,<br>GitHub Actions CI/CD</p>
+              \`,
             });
-            console.log("✅ Message sent: %s", info.messageId);
-            //console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info)); // For Ethereal Accounts
+
+            console.log("✅ Email sent successfully:", info.messageId);
           }
+
           main().catch((error) => {
             console.error("❌ Error sending email:", error);
             process.exit(1);

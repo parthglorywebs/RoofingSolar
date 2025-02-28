@@ -1,4 +1,5 @@
 
+
 name: Send Test Email via Mailjet API (Node.js)
 
 on:
@@ -45,8 +46,8 @@ jobs:
                   },
                   To: [
                     {
-                      Email: "bhagyesh.glorywebsdev@gmail.com",
-                      Name: "Bhagyesh Glory"
+                      Email: "parthm@glorywebsdev.com",
+                      Name: "Parth Glory"
                     }
                   ],
                   Subject: "Greetings from Mailjet (Node.js)!",

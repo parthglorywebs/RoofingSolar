@@ -1,4 +1,4 @@
-name: Send Test Email via Mailjet API (Node.js)
+name: Send Test Email via Gmail SMTP (Node.js)
 
 on:
   push:
@@ -18,50 +18,42 @@ jobs:
           node-version: '18'  # Specific Node.js version for consistency
 
       - name: Install Dependencies
-        run: npm install node-mailjet
+        run: npm install nodemailer
 
-      - name: Send Email with Mailjet API
+      - name: Send Email with Gmail SMTP
         env:
-          MJ_APIKEY_PUBLIC: ${{ secrets.MAILJET_API_KEY }}
-          MJ_APIKEY_PRIVATE: ${{ secrets.MAILJET_SECRET_KEY }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }} # Gmail address to send from
+          GMAIL_PASS: ${{ secrets.GMAIL_APP_PASSWORD }} # App Password for Gmail (highly recommended!)
         run: |
           node <<EOF
-          const Mailjet = require('node-mailjet');
+          const nodemailer = require('nodemailer');
 
-          const mailjet = Mailjet.apiConnect(
-            process.env.MJ_APIKEY_PUBLIC,
-            process.env.MJ_APIKEY_PRIVATE,
-          );
-
-          mailjet
-            .post('send', { version: 'v3.1' })
-            .request({
-              Messages: [
-                {
-                  From: {
-                    Email: "parthglory2025@gmail.com",  // **MUST BE VERIFIED IN MAILJET**
-                    Name: "Parth Glory"
-                  },
-                  To: [
-                    {
-                      Email: "parthglory2025@gmail.com",
-                      Name: "Parth Glory"
-                    }
-                  ],
-                  Subject: "Greetings from Mailjet (Node.js)!",
-                  TextPart: "Dear Parth Glory, welcome to Mailjet!",
-                  HTMLPart: "<h3>Dear Parth Glory, welcome to Mailjet!</h3><br />",
-                }
-              ]
-            })
-            .then((result) => {
-              console.log("✅ Email sent successfully!");
-              console.log(JSON.stringify(result.body, null, 2));  // Log formatted response
-            })
-            .catch((err) => {
-              console.error("❌ Error sending email:");
-              console.error("Status Code:", err.statusCode);
-              console.error("Complete Error:", err);  // Log full error
-              process.exit(1);  // Fail the workflow if email sending fails
+          async function main() {
+            let transporter = nodemailer.createTransport({
+              host: "smtp.gmail.com",
+              port: 465, // or 587 for TLS
+              secure: true, // true for 465, false for other ports
+              auth: {
+                user: process.env.GMAIL_USER,
+                pass: process.env.GMAIL_PASS, // Use an App Password!
+              },
             });
+
+            let info = await transporter.sendMail({
+              from: '"GitHub Actions" <${process.env.GMAIL_USER}>', // sender address
+              to: "parthglory2025@gmail.com", // list of receivers (can be multiple)
+              subject: "Greetings from GitHub Actions (Gmail SMTP)!", // Subject line
+              text: "Dear Parth Glory, this is a test email sent via Gmail SMTP from GitHub Actions!", // plain text body
+              html: "<h3>Dear Parth Glory, this is a test email sent via Gmail SMTP from GitHub Actions!</h3><br />", // html body
+            });
+
+            console.log("✅ Message sent: %s", info.messageId);
+            console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info)); // Only for Ethereal accounts
+
+          }
+
+          main().catch((error) => {
+            console.error("❌ Error sending email:", error);
+            process.exit(1); // Fail the workflow if email sending fails
+          });
           EOF

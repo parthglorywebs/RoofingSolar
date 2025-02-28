@@ -1,4 +1,4 @@
-name: Send Test Email via Gmail SMTP (Student/Testing - Limited Use)
+name: Send Test Email via SMTP (Node.js - Nodemailer)
 
 on:
   push:
@@ -20,41 +20,56 @@ jobs:
       - name: Install Dependencies
         run: npm install nodemailer
 
-      - name: Send Email with Gmail SMTP
+      - name: Send Email with SMTP (Nodemailer)
         env:
-          GMAIL_USER: ${{ secrets.GMAIL_USER }} # Gmail address to send from
-          GMAIL_PASS: ${{ secrets.GMAIL_PASS }} # App Password for Gmail (Highly Recommended)
-          RECIPIENT_EMAIL: parthglory2025@gmail.com # Email address to send to for testing
+          SMTP_HOST: smtp.gmail.com  # or your SMTP host
+          SMTP_PORT: 465       # or your SMTP port (e.g., 587 for TLS)
+          SMTP_USER: ${{ secrets.GMAIL_USER }}  # Your Gmail address
+          SMTP_PASS: ${{ secrets.GMAIL_PASS }}  # Your Gmail App Password (very important!)
+          EMAIL_FROM: ${{ secrets.SENDER_EMAIL }} # Sender's email address
+          EMAIL_TO: ${{ secrets.SENDER_EMAIL }} # Recipient's email address (for testing)
+          SENDER_NAME: ${{ secrets.SENDER_NAME }}
         run: |
           node <<EOF
           const nodemailer = require('nodemailer');
 
           async function main() {
-            let transporter = nodemailer.createTransport({
-              host: "smtp.gmail.com",
-              port: 465,  // Use 465 for secure SSL
-              secure: true, // Use SSL
+            // Create a transporter object using SMTP settings
+            const transporter = nodemailer.createTransport({
+              host: process.env.SMTP_HOST,
+              port: process.env.SMTP_PORT,
+              secure: true, // Use `true` for port 465, `false` for all other ports
               auth: {
-                user: process.env.GMAIL_USER,
-                pass: process.env.GMAIL_PASS, // Use an App Password!
+                user: process.env.SMTP_USER,
+                pass: process.env.SMTP_PASS,
               },
             });
 
-            let info = await transporter.sendMail({
-              from: '"GitHub Actions Test" <${process.env.GMAIL_USER}>', // Sender address
-              to: "${process.env.RECIPIENT_EMAIL}",  // Recipient address (from env)
-              subject: "Gmail SMTP Test from GitHub Actions", // Subject line
-              text: "This is a test email sent via Gmail SMTP from GitHub Actions.", // Plain text body
-              html: "<h3>This is a test email sent via Gmail SMTP from GitHub Actions.</h3>", // HTML body
+            // Verify connection configuration
+            transporter.verify(function(error, success) {
+              if (error) {
+                console.log(error);
+              } else {
+                console.log("Server is ready to take our messages");
+              }
             });
 
-            console.log("✅ Message sent: %s", info.messageId);
-            //console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
+            // Send the email
+            const info = await transporter.sendMail({
+              from: {
+                name: process.env.SENDER_NAME,
+                address: process.env.EMAIL_FROM
+              }, // Sender address
+              to: process.env.EMAIL_TO,  // Recipient address
+              subject: "Test Email from GitHub Actions!",
+              text: "This is a test email sent using Nodemailer and Gmail SMTP.",
+              html: "<p>This is a <b>test email</b> sent using Nodemailer and Gmail SMTP.</p>",
+            });
 
+            console.log("Message sent: %s", info.messageId);
           }
 
           main().catch((error) => {
-            console.error("❌ Error sending email:", error);
-            process.exit(1); // Fail the workflow
+            console.error("Error sending email:", error);
           });
           EOF

@@ -1014,7 +1014,7 @@ const styles = StyleSheet.create({
   },
   closeIcon: {
     position: 'absolute',
-    top: -5,
+    top: -1,
     right: -1,
     backgroundColor: 'red',
     width: 22,

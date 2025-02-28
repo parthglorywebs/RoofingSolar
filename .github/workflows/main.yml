@@ -26,7 +26,7 @@ jobs:
           BREVO_PORT: 587
           BREVO_USERNAME: "86daf4001@smtp-brevo.com"
           BREVO_PASSWORD: "9HUFhqYPs4xgNJAc"
-          RECIPIENT_EMAIL: "parthglory2025@gmail.com"  # For testing
+          RECIPIENT_EMAIL: "bhagyesh.glorywebsdev@gmail.com"  # For testing
           SENDER_EMAIL: "parthglory2025@gmail.com"  # Verified Sender in Brevo
         run: |
           node <<EOF
@@ -50,7 +50,7 @@ jobs:
               to: process.env.RECIPIENT_EMAIL,
               subject: "Brevo SMTP Test from GitHub Actions",
               text: "This is a test email sent via Brevo SMTP from GitHub Actions.",
-              html: "<h3>This is a test email sent via Brevo SMTP from GitHub Actions.</h3>",
+              html: "<h3>This is a test email sent via SMTP from GitHub Actions.</h3>",
             });
             console.log("✅ Message sent: %s", info.messageId);
             //console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info)); // For Ethereal Accounts

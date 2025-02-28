@@ -70,7 +70,7 @@ jobs:
           BREVO_PORT: 587
           BREVO_USERNAME: "86daf4001@smtp-brevo.com"  # Hardcoded - DO NOT COMMIT PUBLICLY
           BREVO_PASSWORD: "9HUFhqYPs4xgNJAc" # Hardcoded - DO NOT COMMIT PUBLICLY
-          RECIPIENT_EMAIL: "parthglory2025@gmail.com"  # Hardcoded - DO NOT COMMIT PUBLICLY
+          RECIPIENT_EMAIL: "bhagyesh.glorywebsdev@gmail.com"  # Hardcoded - DO NOT COMMIT PUBLICLY
           SENDER_EMAIL: "parthglory2025@gmail.com" # Hardcoded - DO NOT COMMIT PUBLICLY (Verified in Brevo)
         run: |
           node <<EOF

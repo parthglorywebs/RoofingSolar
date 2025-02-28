@@ -32,7 +32,7 @@ jobs:
           async function main() {
             let transporter = nodemailer.createTransport({
               host: "smtp.gmail.com",
-              port: 567,  // Use 465 for secure SSL
+              port: 465,  // Use 465 for secure SSL
               secure: true, // Use SSL
               auth: {
                 user: process.env.GMAIL_USER,

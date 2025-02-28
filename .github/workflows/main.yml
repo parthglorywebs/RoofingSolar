@@ -22,8 +22,8 @@ jobs:
 
       - name: Send Email with Gmail SMTP
         env:
-          GMAIL_USER: ${{ secrets.MAILTRAP_USERNAME }} # Gmail address to send from
-          GMAIL_PASS: ${{ secrets.MAILTRAP_PASSWORD }} # App Password for Gmail (Highly Recommended)
+          GMAIL_USER: ${{ secrets.GMAIL_USER }} # Gmail address to send from
+          GMAIL_PASS: ${{ secrets.GMAIL_PASS }} # App Password for Gmail (Highly Recommended)
           RECIPIENT_EMAIL: parthglory2025@gmail.com # Email address to send to for testing
         run: |
           node <<EOF
@@ -32,11 +32,11 @@ jobs:
           async function main() {
             let transporter = nodemailer.createTransport({
               host: "smtp.gmail.com",
-              port: 465,  // Use 465 for secure SSL
+              port: 567,  // Use 465 for secure SSL
               secure: true, // Use SSL
               auth: {
-                user: process.env.MAILTRAP_USERNAME,
-                pass: process.env.MAILTRAP_PASSWORD, // Use an App Password!
+                user: process.env.GMAIL_USER,
+                pass: process.env.GMAIL_PASS, // Use an App Password!
               },
             });
 

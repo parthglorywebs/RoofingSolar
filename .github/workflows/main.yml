@@ -15,38 +15,22 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '18'  # Specific Node.js version for consistency
 
       - name: Install Dependencies
-        run: npm install
+        run: npm install nodemailer
 
-      - name: Install Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Build APK
-        run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleRelease
-
-      - name: Find APK Path
-        id: find_apk
-        run: echo "APK_PATH=$(find android/app/build/outputs/apk/release/ -name "*.apk" | head -n 1)" >> $GITHUB_ENV
-
-      - name: Upload APK as GitHub Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Android-APK
-          path: ${{ env.APK_PATH }}
-
-      - name: Send Email with GitHub Artifact Link
+      - name: Send Email with Brevo SMTP
         env:
           BREVO_HOST: "smtp-relay.brevo.com"
           BREVO_PORT: 587
           BREVO_USERNAME: "86daf4001@smtp-brevo.com"
           BREVO_PASSWORD: "9HUFhqYPs4xgNJAc"
-          RECIPIENT_EMAIL: "parthglory2025@gmail.com"
-          SENDER_EMAIL: "parthglory2025@gmail.com"
+          RECIPIENT_EMAIL: "parthglory2025@gmail.com"  # For testing
+          SENDER_EMAIL: "parthglory2025@gmail.com"  # Verified Sender in Brevo
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+
         run: |
           node <<EOF
           const nodemailer = require('nodemailer');
@@ -54,7 +38,7 @@ jobs:
           async function main() {
             const GITHUB_RUN_ID = process.env.GITHUB_RUN_ID;
             const REPO = process.env.GITHUB_REPOSITORY;
-            const APK_LINK = \`https://github.com/\${REPO}/actions/runs/\${GITHUB_RUN_ID}\`;
+            const APK_LINK = \`https://github.com/\${REPO}/actions/runs/\${GITHUB_RUN_ID}/artifacts\`;
 
             let transporter = nodemailer.createTransport({
               host: process.env.BREVO_HOST,

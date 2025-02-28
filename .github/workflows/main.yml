@@ -2,7 +2,7 @@ name: Build and Send APK
 
 on:
   push:
-    branches: [dev]  # Trigger on pushes to the 'dev' branch
+    branches: [dev]
 
 jobs:
   build_apk:
@@ -29,14 +29,17 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease
 
-      - name: Upload APK to Transfer.sh
-        run: |
-          APK_PATH=$(find android/app/build/outputs/apk/release/ -name "*.apk" | head -n 1)
-          UPLOAD_URL=$(curl --upload-file $APK_PATH https://transfer.sh/$(basename $APK_PATH))
-          echo "APK_LINK=$UPLOAD_URL" >> $GITHUB_ENV
-          echo "✅ APK Uploaded: $UPLOAD_URL"
+      - name: Find APK Path
+        id: find_apk
+        run: echo "APK_PATH=$(find android/app/build/outputs/apk/release/ -name "*.apk" | head -n 1)" >> $GITHUB_ENV
 
-      - name: Send Email with APK Link
+      - name: Upload APK as GitHub Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Android-APK
+          path: ${{ env.APK_PATH }}
+
+      - name: Send Email with GitHub Artifact Link
         env:
           BREVO_HOST: "smtp-relay.brevo.com"
           BREVO_PORT: 587
@@ -44,12 +47,15 @@ jobs:
           BREVO_PASSWORD: "9HUFhqYPs4xgNJAc"
           RECIPIENT_EMAIL: "parthglory2025@gmail.com"
           SENDER_EMAIL: "parthglory2025@gmail.com"
-          APK_LINK: ${{ env.APK_LINK }}
         run: |
           node <<EOF
           const nodemailer = require('nodemailer');
 
           async function main() {
+            const GITHUB_RUN_ID = process.env.GITHUB_RUN_ID;
+            const REPO = process.env.GITHUB_REPOSITORY;
+            const APK_LINK = \`https://github.com/\${REPO}/actions/runs/\${GITHUB_RUN_ID}\`;
+
             let transporter = nodemailer.createTransport({
               host: process.env.BREVO_HOST,
               port: process.env.BREVO_PORT,
@@ -68,8 +74,8 @@ jobs:
               from: \`"GitHub Actions" <\${process.env.SENDER_EMAIL}>\`,
               to: process.env.RECIPIENT_EMAIL,
               subject: "Your APK is Ready!",
-              text: \`Download your APK here: \${process.env.APK_LINK}\`,
-              html: \`<p>Your APK is ready! Click below to download:</p><a href="\${process.env.APK_LINK}">\${process.env.APK_LINK}</a>\`,
+              text: \`Download your APK here: \${APK_LINK}\`,
+              html: \`<p>Your APK is ready! Click below to download:</p><a href="\${APK_LINK}">\${APK_LINK}</a>\`,
             });
 
             console.log("✅ Email sent: %s", info.messageId);

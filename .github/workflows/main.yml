@@ -35,8 +35,8 @@ jobs:
               port: 465,  // Use 465 for secure SSL
               secure: true, // Use SSL
               auth: {
-                user: process.env.GMAIL_USER,
-                pass: process.env.GMAIL_PASS, // Use an App Password!
+                user: process.env.MAILTRAP_USERNAME,
+                pass: process.env.MAILTRAP_PASSWORD, // Use an App Password!
               },
             });
 

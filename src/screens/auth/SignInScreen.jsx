@@ -181,7 +181,9 @@ const SignIn = ({navigation}) => {
         source={require('../../assets/images/logo_login.png')}
         style={styles.logoIcon}
       />
-      <Text style={styles.header} onPress={handleFill}>
+      <Text style={styles.header} 
+      // onPress={handleFill}
+      >
         Sign in to your Account
       </Text>
 

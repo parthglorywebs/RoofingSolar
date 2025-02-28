@@ -77,13 +77,13 @@ jobs:
                   },
                   To: [
                     {
-                      Email: "parthglory2025@gmail.com",
-                      Name: "Parth Glory"
+                      Email: "bhagyesh.glorywebsdev@gmail.com",
+                      Name: "Bhagyesh Glory"
                     }
                   ],
                   Subject: "New Android Debug APK Build Available",
-                  TextPart: `A new debug APK build is available for download.  Click the link below to download:\n\n${apkUrl}`,
-                  HTMLPart: `<h3>New Android Debug APK Build Available</h3><p>Click the link below to download:</p><p><a href="${apkUrl}">${apkUrl}</a></p>`,
+                  TextPart: \`A new debug APK build is available for download.  Click the link below to download:\n\n${apkUrl}\`,
+                  HTMLPart: \`<h3>New Android Debug APK Build Available</h3><p>Click the link below to download:</p><p><a href="${apkUrl}">${apkUrl}</a></p>\`,
                 }
               ]
             });

@@ -1,4 +1,4 @@
-name: Send Test Email via Mailtrap (curl)
+name: Send Test Email via Gmail SMTP (Student/Testing - Limited Use)
 
 on:
   push:
@@ -12,62 +12,49 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Send Email with Mailtrap (curl)
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'  # Specific Node.js version for consistency
+
+      - name: Install Dependencies
+        run: npm install nodemailer
+
+      - name: Send Email with Gmail SMTP
         env:
-          MAILTRAP_USERNAME: ${{ secrets.MAILTRAP_USERNAME }}
-          MAILTRAP_PASSWORD: ${{ secrets.MAILTRAP_PASSWORD }}
-          RECIPIENT_EMAIL: "parthglory2025@gmail.com"  # Or parthglory2025@gmail.com for testing
+          GMAIL_USER: ${{ secrets.MAILTRAP_USERNAME }} # Gmail address to send from
+          GMAIL_PASS: ${{ secrets.MAILTRAP_PASSWORD }} # App Password for Gmail (Highly Recommended)
+          RECIPIENT_EMAIL: parthglory2025@gmail.com # Email address to send to for testing
         run: |
-          echo 'Looking to send emails in production? Check out our Email API/SMTP product!'
-          curl \
-          --ssl-reqd \
-          --url 'smtp://sandbox.smtp.mailtrap.io:2525' \
-          --user "${MAILTRAP_USERNAME}:${MAILTRAP_PASSWORD}" \
-          --mail-from from@example.com \
-          --mail-rcpt "${RECIPIENT_EMAIL}" \
-          --upload-file - <<EOF
-          From: Magic Elves <from@example.com>
-          To: "${RECIPIENT_EMAIL}"
-          Subject: You are awesome!
-          Content-Type: multipart/alternative; boundary="boundary-string"
+          node <<EOF
+          const nodemailer = require('nodemailer');
 
-          --boundary-string
-          Content-Type: text/plain; charset="utf-8"
-          Content-Transfer-Encoding: quoted-printable
-          Content-Disposition: inline
+          async function main() {
+            let transporter = nodemailer.createTransport({
+              host: "smtp.gmail.com",
+              port: 465,  // Use 465 for secure SSL
+              secure: true, // Use SSL
+              auth: {
+                user: process.env.GMAIL_USER,
+                pass: process.env.GMAIL_PASS, // Use an App Password!
+              },
+            });
 
-          Congrats for sending test email with Mailtrap!
+            let info = await transporter.sendMail({
+              from: '"GitHub Actions Test" <${process.env.GMAIL_USER}>', // Sender address
+              to: "${process.env.RECIPIENT_EMAIL}",  // Recipient address (from env)
+              subject: "Gmail SMTP Test from GitHub Actions", // Subject line
+              text: "This is a test email sent via Gmail SMTP from GitHub Actions.", // Plain text body
+              html: "<h3>This is a test email sent via Gmail SMTP from GitHub Actions.</h3>", // HTML body
+            });
 
-          If you are viewing this email in your inbox =E2=80=93 the integration works.
-          Now send your email using our SMTP server and integration of your choice!
+            console.log("✅ Message sent: %s", info.messageId);
+            //console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info));
 
-          Good luck! Hope it works.
+          }
 
-          --boundary-string
-          Content-Type: text/html; charset="utf-8"
-          Content-Transfer-Encoding: quoted-printable
-          Content-Disposition: inline
-
-          <!doctype html>
-          <html>
-            <head>
-              <meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3DUTF-8">
-            </head>
-            <body style=3D"font-family: sans-serif;">
-              <div style=3D"display: block; margin: auto; max-width: 600px;" class=3D"main">
-                <h1 style=3D"font-size: 18px; font-weight: bold; margin-top: 20px">Congrats for sending test email with Mailtrap!</h1>
-                <p>If you are viewing this email in your inbox =E2=80=93 the integration works.</p>
-                <img alt=3D"Inspect with Tabs" src=3D"https://assets-examples.mailtrap.io/integration-examples/welcome.png" style=3D"width: 100%;">
-                <p>Now send your email using our SMTP server and integration of your choice!</p>
-                <p>Good luck! Hope it works.</p>
-              </div>
-              <!-- Example of invalid for email html/css, will be detected by Mailtrap: -->
-              <style>
-                .main { background-color: white; }
-                a:hover { border-left-width: 1em; min-height: 2em; }
-              </style>
-            </body>
-          </html>
-
-          --boundary-string--
+          main().catch((error) => {
+            console.error("❌ Error sending email:", error);
+            process.exit(1); // Fail the workflow
+          });
           EOF

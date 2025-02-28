@@ -1,29 +1,61 @@
-name: Send Test Email via Mailjet API (Node.js)
+name: Build Android Debug APK and Send Email via Mailjet
 
 on:
   push:
-    branches: [dev]  # Trigger on pushes to the 'dev' branch
+    branches: [dev]
+  pull_request:
+    branches: [dev]
 
 jobs:
-  send_email:
+  build_and_email:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'  # Specific Node.js version for consistency
+          node-version: '18'  # or '18.x'
 
-      - name: Install Dependencies
-        run: npm install node-mailjet
+      - name: Install dependencies
+        run: |
+          npm install
+          cd android
+          ./gradlew clean
+
+      - name: Assemble Debug APK
+        run: |
+          cd android
+          ./gradlew assembleDebug
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug.apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Generate Download URL
+        id: generate_download_url
+        run: |
+          APK_ARTIFACT_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts/${{ github.workflow }}/app-debug.apk"
+          echo "::set-output name=apk_url::$APK_ARTIFACT_URL"
+          echo "APK Download URL: $APK_ARTIFACT_URL"
 
       - name: Send Email with Mailjet API
         env:
           MJ_APIKEY_PUBLIC: ${{ secrets.MAILJET_API_KEY }}
           MJ_APIKEY_PRIVATE: ${{ secrets.MAILJET_SECRET_KEY }}
+          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }} # Add Recipient Email in secrets of repo
+          SENDER_EMAIL:  ${{ secrets.SENDER_EMAIL }} # Add Sender Email in secrets of repo(should verified in mailjet)
+          SENDER_NAME: ${{ secrets.SENDER_NAME }} # Add Sender Name in secrets of repo
         run: |
           node <<EOF
           const Mailjet = require('node-mailjet');
@@ -33,24 +65,26 @@ jobs:
             process.env.MJ_APIKEY_PRIVATE,
           );
 
+          const apkUrl = "${{ steps.generate_download_url.outputs.apk_url }}";
+
           const request = mailjet
             .post('send', { version: 'v3.1' })
             .request({
               Messages: [
                 {
                   From: {
-                    Email: "parthglory2025@gmail.com",  // **IMPORTANT: MUST BE VERIFIED IN MAILJET**
-                    Name: "Parth Glory"
+                    Email: process.env.SENDER_EMAIL,
+                    Name: process.env.SENDER_NAME
                   },
                   To: [
                     {
-                      Email: "parthglory2025@gmail.com",
-                      Name: "Parth Glory"
+                      Email: process.env.RECIPIENT_EMAIL,
+                      Name: "Recipient"  // You can customize this
                     }
                   ],
-                  Subject: "Greetings from Mailjet (Node.js)!",
-                  TextPart: "Dear Parth Glory, welcome to Mailjet!",
-                  HTMLPart: "<h3>Dear Parth Glory, welcome to Mailjet!</h3><br />",
+                  Subject: "New Android Debug APK Build Available",
+                  TextPart: `A new debug APK build is available for download.  Click the link below to download:\n\n${apkUrl}`,
+                  HTMLPart: `<h3>New Android Debug APK Build Available</h3><p>Click the link below to download:</p><p><a href="${apkUrl}">${apkUrl}</a></p>`,
                 }
               ]
             });
@@ -58,11 +92,12 @@ jobs:
           request
             .then((result) => {
               console.log("Email sent successfully!");
-              console.log(JSON.stringify(result.body, null, 2));  // Log the response body with formatting
+              console.log(JSON.stringify(result.body, null, 2));
             })
             .catch((err) => {
               console.error("Error sending email:");
               console.error("Status Code:", err.statusCode);
-              console.error("Complete Error:", err); // Log the entire error object
+              console.error("Complete Error:", err);
+              process.exit(1); // Exit with error code to fail the workflow
             });
           EOF

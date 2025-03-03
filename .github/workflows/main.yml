@@ -20,6 +20,33 @@ jobs:
       - name: Install Dependencies
         run: npm install nodemailer
 
+      # Placeholder for building the APK.  Replace with your actual build steps.
+      - name: Build APK
+        run: |
+          echo "Building APK..."
+          mkdir -p app/build/outputs/apk/debug
+          touch app/build/outputs/apk/debug/app-debug.apk  # Create a dummy apk for testing. REMOVE THIS when you have a real APK build process.
+          echo "APK built at app/build/outputs/apk/debug/app-debug.apk"
+
+      # Step to upload the APK to a temporary location. Replace with your actual path
+      - name: Upload APK to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+
+      # Upload APK to Transfer.sh (free, temporary file hosting)
+      - name: Upload APK to Transfer.sh
+        run: |
+          APK_PATH=app/build/outputs/apk/debug/app-debug.apk  # Replace with your actual APK path.
+          if [ -f "$APK_PATH" ]; then
+            APK_URL=$(curl --upload-file "$APK_PATH" https://transfer.sh/app-debug.apk | tee output.txt)
+            echo "APK_URL=$APK_URL" >> $GITHUB_ENV
+          else
+            echo "APK not found at $APK_PATH"
+            exit 1
+          fi
+
       - name: Send Email with Brevo SMTP
         env:
           BREVO_HOST: "smtp-relay.brevo.com"
@@ -28,17 +55,14 @@ jobs:
           BREVO_PASSWORD: "9HUFhqYPs4xgNJAc"
           RECIPIENT_EMAIL: "parthglory2025@gmail.com"  # For testing
           SENDER_EMAIL: "parthglory2025@gmail.com"  # Verified Sender in Brevo
-          GITHUB_RUN_ID: ${{ github.run_id }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
+          APK_URL: ${{ env.APK_URL }}
 
         run: |
           node <<EOF
           const nodemailer = require('nodemailer');
 
           async function main() {
-            const GITHUB_RUN_ID = process.env.GITHUB_RUN_ID;
-            const REPO = process.env.GITHUB_REPOSITORY;
-            const APK_LINK = \`https://github.com/\${REPO}/actions/runs/\${GITHUB_RUN_ID}/artifacts\`;
+            const APK_LINK = process.env.APK_URL;
 
             let transporter = nodemailer.createTransport({
               host: process.env.BREVO_HOST,
@@ -59,7 +83,7 @@ jobs:
               to: process.env.RECIPIENT_EMAIL,
               subject: "Your APK is Ready!",
               text: \`Download your APK here: \${APK_LINK}\`,
-              html: \`<p>Your APK is ready! Click below to download:</p><a href="\${APK_LINK}">\${APK_LINK}</a>\`,
+              html: \`<p>Your APK is ready! Click below to download:</p><a href="\${APK_LINK}">Download APK</a>\`,
             });
 
             console.log("✅ Email sent: %s", info.messageId);

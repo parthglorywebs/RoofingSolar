@@ -39,7 +39,7 @@ jobs:
           fi
         shell: /usr/bin/bash -e {0}
 
-      - name: Upload APK to AppHost
+      - name: Upload APK to Upload.app
         if: steps.build_apk.outputs.apk_built == 'true'
         env:
           APK_PATH: ${{ env.APK_PATH }}
@@ -53,22 +53,22 @@ jobs:
           echo "Listing APK directory..."
           ls -l android/app/build/outputs/apk/debug/
 
-          echo "Uploading APK to AppHost..."
+          echo "Uploading APK to Upload.app..."
 
           # Retry logic (attempt up to 3 times)
           for i in {1..3}; do
-            RESPONSE=$(curl -s -F "file=@$APK_PATH" https://upload.appho.st)
+            RESPONSE=$(curl -s -F "file=@$APK_PATH" https://upload.app)
 
-            echo "AppHost Response (attempt $i): $RESPONSE"
+            echo "Upload.app Response (attempt $i): $RESPONSE"
 
-            APPHOST_LINK=$(echo "$RESPONSE" | jq -r '.url')
+            UPLOADAPP_LINK=$(echo "$RESPONSE" | jq -r '.url')
 
-            if [ "$APPHOST_LINK" != "null" ]; then
-              echo "✅ APK uploaded! Link: $APPHOST_LINK"
-              echo "APPHOST_LINK=$APPHOST_LINK" >> $GITHUB_ENV
+            if [ "$UPLOADAPP_LINK" != "null" ]; then
+              echo "✅ APK uploaded! Link: $UPLOADAPP_LINK"
+              echo "UPLOADAPP_LINK=$UPLOADAPP_LINK" >> $GITHUB_ENV
               break # Exit the loop if successful
             else
-              echo "❌ Error uploading APK to AppHost (attempt $i)! Response: $RESPONSE"
+              echo "❌ Error uploading APK to Upload.app (attempt $i)! Response: $RESPONSE"
               if [ $i -eq 3 ]; then
                 echo "❌ Max retries reached. Exiting."
                 exit 1
@@ -92,8 +92,8 @@ jobs:
           const nodemailer = require('nodemailer');
 
           async function main() {
-            const APPHOST_LINK = process.env.APPHOST_LINK || "No link available (build or upload failed)"; // Use link, or fallback
-            const success = process.env.APPHOST_LINK ? true : false;
+            const UPLOADAPP_LINK = process.env.UPLOADAPP_LINK || "No link available (build or upload failed)"; // Use link, or fallback
+            const success = process.env.UPLOADAPP_LINK ? true : false;
 
             let transporter = nodemailer.createTransport({
               host: process.env.BREVO_HOST,
@@ -113,8 +113,8 @@ jobs:
               from: \`"GitHub Actions" <\${process.env.SENDER_EMAIL}>\`,
               to: process.env.RECIPIENT_EMAIL,
               subject: success ? "Your APK is Ready!" : "APK Build/Upload Failed",
-              text: success ? \`Download your APK here: \${APPHOST_LINK}\` : "APK build or upload to AppHost failed. Check the workflow logs for details.",
-              html: success ? \`<p>Your APK is ready! Click below to download:</p><a href="\${APPHOST_LINK}">\${APPHOST_LINK}</a>\` : "<p>APK build or upload to AppHost failed. Check the workflow logs for details.</p>",
+              text: success ? \`Download your APK here: \${UPLOADAPP_LINK}\` : "APK build or upload to Upload.app failed. Check the workflow logs for details.",
+              html: success ? \`<p>Your APK is ready! Click below to download:</p><a href="\${UPLOADAPP_LINK}">\${UPLOADAPP_LINK}</a>\` : "<p>APK build or upload to Upload.app failed. Check the workflow logs for details.</p>",
             });
 
             console.log("✅ Email sent: %s", info.messageId);

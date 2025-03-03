@@ -5,6 +5,7 @@ const config = {
     baseUrl: process.env.REACT_APP_BASE_URL || 'http://13.56.14.87/api/', 
     webUrl: 'http://13.56.14.87/',
     profileImage: 'http://13.56.14.87/', 
+    baseStorage: 'http://13.56.14.87/storage',
   };
   
   export default config;

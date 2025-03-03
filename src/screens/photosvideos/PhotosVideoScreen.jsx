@@ -25,7 +25,7 @@ import {getLoginDetails} from '../../utils/AsyncStorage';
 import Colors from '../../assets/styling/colors';
 import {Calendar} from 'react-native-calendars';
 import ImageViewer from 'react-native-image-zoom-viewer';
-import FastImage from 'react-native-fast-image'
+import FastImage from 'react-native-fast-image';
 
 const {width, height} = Dimensions.get('window');
 
@@ -56,6 +56,9 @@ const PhotosVideoScreen = ({selectedJob}) => {
   const [tempStartDate, setTempStartDate] = useState(null);
   const [tempEndDate, setTempEndDate] = useState(null);
   const [showNotesIndicator, setShowNotesIndicator] = useState(false);
+
+  const [mediaMenuVisible, setMediaMenuVisible] = useState(false);
+  const [selectedMediaForMenu, setSelectedMediaForMenu] = useState(null);
 
   // Pagination states
   const [page, setPage] = useState(1); // Current page number
@@ -120,14 +123,15 @@ const PhotosVideoScreen = ({selectedJob}) => {
         if (response.status !== 200) {
           // Check for 422 status specifically
           if (response.status === 422) {
-             setGroupedMedia({}); // Clear any existing data
-             console.log('No Photos and videos found for the selected date range');
-             // Optionally, show a user-friendly message (not an Alert, just a text in the UI)
-             return; // Exit the function early
+            setGroupedMedia({}); // Clear any existing data
+            console.log(
+              'No Photos and videos found for the selected date range',
+            );
+            // Optionally, show a user-friendly message (not an Alert, just a text in the UI)
+            return; // Exit the function early
           } else {
             throw new Error('Request failed with status ' + response.status); //Handle other errors
           }
-
         }
 
         const data = response.data;
@@ -140,7 +144,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
           setGroupedMedia({});
           // console.log('No Photos and videos found');
         } else if (data && data.data) {
-           const grouped = data.data.data.reduce((acc, dayData) => {
+          const grouped = data.data.data.reduce((acc, dayData) => {
             const dayItems = dayData.is_item.map(item => ({
               uri: `${config.profileImage}storage/project_images/${item.project_image}`,
               type: item.media_type,
@@ -164,23 +168,25 @@ const PhotosVideoScreen = ({selectedJob}) => {
           } else {
             // Append new data to existing data
             setGroupedMedia(prevGroupedMedia => {
-                const newGroupedMedia = { ...prevGroupedMedia };
-                for (const date in grouped) {
-                  if (newGroupedMedia[date]) {
-                    // If date already exists, append the items
-                    newGroupedMedia[date] = [...newGroupedMedia[date], ...grouped[date]];
-                  } else {
-                    // If date doesn't exist, add the new date and items
-                    newGroupedMedia[date] = grouped[date];
-                  }
+              const newGroupedMedia = {...prevGroupedMedia};
+              for (const date in grouped) {
+                if (newGroupedMedia[date]) {
+                  // If date already exists, append the items
+                  newGroupedMedia[date] = [
+                    ...newGroupedMedia[date],
+                    ...grouped[date],
+                  ];
+                } else {
+                  // If date doesn't exist, add the new date and items
+                  newGroupedMedia[date] = grouped[date];
                 }
+              }
               return newGroupedMedia;
             });
           }
 
           setTotalPages(data.data.last_page); // Set total pages from response
           setPage(currentPage); // Update current page state
-
         } else {
           console.error('Invalid data format received from API:', data);
           Alert.alert(
@@ -263,6 +269,23 @@ const PhotosVideoScreen = ({selectedJob}) => {
       },
     );
   }, [fetchPhotoVideos, selectedJob]);
+
+  const openMediaMenu = item => {
+    setSelectedMediaForMenu(item);
+    setMediaMenuVisible(true);
+  };
+
+  // Function to close the media options menu
+  const closeMediaMenu = () => {
+    setSelectedMediaForMenu(null);
+    setMediaMenuVisible(false);
+  };
+
+  // Function to handle setting the media as cover photo (placeholder)
+  const handleSetAsCoverPhoto = () => {
+    console.log('Set as Cover Photo');
+    closeMediaMenu();
+  };
 
   const handleRemoveMedia = useCallback(
     (uri, mediaId, date) => {
@@ -406,7 +429,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
               </Text>
             </View>
 
-            {showDeleteButton && (
+            {/* {showDeleteButton && (
               <TouchableOpacity
                 style={styles.closeIcon}
                 onPress={() =>
@@ -415,7 +438,23 @@ const PhotosVideoScreen = ({selectedJob}) => {
                 {isDeleting ? (
                   <ActivityIndicator size="small" color="white" />
                 ) : (
-                  <Text style={styles.closeText}>X</Text>
+                    <MaterialCommunityIcons name="dots-vertical" size={20} color="black" />
+                )}
+              </TouchableOpacity>
+            )} */}
+
+            {showDeleteButton && (
+              <TouchableOpacity
+                style={styles.closeIcon}
+                onPress={() => openMediaMenu(item)}>
+                {isDeleting ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <MaterialCommunityIcons
+                    name="dots-vertical"
+                    size={20}
+                    color="black"
+                  />
                 )}
               </TouchableOpacity>
             )}
@@ -426,6 +465,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
     [
       deletingMediaUri,
       contractorId,
+      openMediaMenu,
       handleRemoveMedia,
       setSelectedMedia,
       setModalVisible,
@@ -502,7 +542,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
         end: moment(endDate).format('MMMM D, YYYY'),
       });
 
-      fetchPhotoVideos(1, startDate, endDate);  // Reset to page 1 when applying date filter
+      fetchPhotoVideos(1, startDate, endDate); // Reset to page 1 when applying date filter
     }
 
     setMenuVisible(false);
@@ -658,7 +698,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
         end: moment(tempEndDate).format('MMMM D, YYYY'),
       });
       setShowCalendar(false);
-      fetchPhotoVideos(1, tempStartDate, tempEndDate);  // Reset to page 1 when applying date range
+      fetchPhotoVideos(1, tempStartDate, tempEndDate); // Reset to page 1 when applying date range
     } else {
       Alert.alert('Please select a valid date range.');
     }
@@ -759,7 +799,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
   const renderFooter = () => {
     if (isFetchingMore) {
       return (
-        <View style={{ paddingVertical: 20 }}>
+        <View style={{paddingVertical: 20}}>
           <ActivityIndicator size="large" color="#007bff" />
         </View>
       );
@@ -767,15 +807,16 @@ const PhotosVideoScreen = ({selectedJob}) => {
       // Only show the message when all pages are loaded and there's media
       return (
         <TouchableOpacity
-        style={{ paddingVertical: 20, alignItems: 'center' }}
-        onPress={() => {
-          if (flatListRef.current) {
-            flatListRef.current.scrollToOffset({ offset: 0, animated: true });
-          }
-        }}
-      >
-        <Text style={{ color: '#888' }}>You have reached this project media.  Tap to return to top</Text>
-      </TouchableOpacity>
+          style={{paddingVertical: 20, alignItems: 'center'}}
+          onPress={() => {
+            if (flatListRef.current) {
+              flatListRef.current.scrollToOffset({offset: 0, animated: true});
+            }
+          }}>
+          <Text style={{color: '#888'}}>
+            You have reached this project media. Tap to return to top
+          </Text>
+        </TouchableOpacity>
       );
     }
     return null;
@@ -783,7 +824,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
 
   return (
     <View style={styles.container}>
-      {apiLoading && initialLoad ? (  // Show loader if API is loading and it's the initial load
+      {apiLoading && initialLoad ? ( // Show loader if API is loading and it's the initial load
         <ActivityIndicator
           size="large"
           color="#007bff"
@@ -795,15 +836,15 @@ const PhotosVideoScreen = ({selectedJob}) => {
         </View>
       ) : (
         <FlatList
-        ref={flatListRef} // Attach the ref here
-        data={Object.entries(groupedMedia)}
-        keyExtractor={(item, index) => index.toString()}
-        renderItem={({item}) => renderDateSection(item)}
-        ListHeaderComponent={renderHeader}
-        ListFooterComponent={renderFooter}  // Add footer loading indicator
-        onEndReached={handleLoadMore}        // Load more data when reaching the end
-        onEndReachedThreshold={0.5}         // Trigger load more when 50% of the list is visible
-      />
+          ref={flatListRef} // Attach the ref here
+          data={Object.entries(groupedMedia)}
+          keyExtractor={(item, index) => index.toString()}
+          renderItem={({item}) => renderDateSection(item)}
+          ListHeaderComponent={renderHeader}
+          ListFooterComponent={renderFooter} // Add footer loading indicator
+          onEndReached={handleLoadMore} // Load more data when reaching the end
+          onEndReachedThreshold={0.5} // Trigger load more when 50% of the list is visible
+        />
       )}
 
       <View style={styles.topRightContainer}>
@@ -827,6 +868,42 @@ const PhotosVideoScreen = ({selectedJob}) => {
         </TouchableOpacity>
       </View>
 
+      {/* Media Options Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={mediaMenuVisible}
+        onRequestClose={closeMediaMenu}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.mediaMenuContainer}>
+            <TouchableOpacity
+              style={styles.mediaMenuItem}
+              onPress={() => {
+                handleSetAsCoverPhoto();
+              }}>
+              <Text>Set as Cover Photo</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.mediaMenuItem}
+              onPress={() => {
+                handleRemoveMedia(
+                  selectedMediaForMenu.uri,
+                  selectedMediaForMenu.mediaId,
+                  selectedMediaForMenu.date,
+                );
+                closeMediaMenu();
+              }}>
+              <Text style={{color: 'red'}}>Remove File</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.mediaMenuItem}
+              onPress={closeMediaMenu}>
+              <Text>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <Modal
         animationType="slide"
         transparent={true}
@@ -846,21 +923,20 @@ const PhotosVideoScreen = ({selectedJob}) => {
                 {selectedMedia &&
                   selectedMedia.type &&
                   selectedMedia.type.toLowerCase().includes('image') && (
-                    
                     <FastImage // Use FastImage here
-                    source={{
-                      uri: selectedMedia.uri, // Use thumbnail if available
-                      priority: FastImage.priority.high, // Or 'high', 'low'
-                    }}
+                      source={{
+                        uri: selectedMedia.uri, // Use thumbnail if available
+                        priority: FastImage.priority.high, // Or 'high', 'low'
+                      }}
                       style={{width: '100%', height: 400}}
                       renderIndicator={() => null}
-                    resizeMode={FastImage.resizeMode.cover} // Or 'contain', 'stretch', etc.
-                       loadingRender={() => (
+                      resizeMode={FastImage.resizeMode.cover} // Or 'contain', 'stretch', etc.
+                      loadingRender={() => (
                         <View style={styles.loadingContainer}>
                           <ActivityIndicator size="large" color="#007bff" />
                         </View>
                       )}
-                  />
+                    />
                   )}
 
                 {selectedMedia &&
@@ -1016,7 +1092,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -1,
     right: -1,
-    backgroundColor: 'red',
+    backgroundColor: 'white',
     width: 22,
     height: 22,
     borderRadius: 15,
@@ -1060,6 +1136,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  mediaMenuContainer: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 15,
+    width: '80%', // Adjust width as needed
+    maxWidth: 400, // Maximum width
+    alignItems: 'stretch', // Ensure buttons stretch to full width
+  },
+  mediaMenuItem: {
+    paddingVertical: 12, // Increased padding for better touch target
+    paddingHorizontal: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee', // Light border
+    alignItems: 'center',
+  },
+
+  mediaMenuText: {
+    fontSize: 16, // Readable font size
+    color: '#333', // Darker text color
+    textAlign: 'center',
   },
   modalContainer: {
     backgroundColor: 'white',

@@ -72,6 +72,9 @@ const PropertyInfo = () => {
   const [selectedJob, setSelectedJob] = useState(initialSelectedJob);
   const [stageInfo, setStageInfo] = useState(null);
 
+  const [coverPhoto, setCoverPhoto] = useState(null);
+  const [coverPhotoLoading, setCoverPhotoLoading] = useState(true);
+
   useEffect(() => {
     if (itemData) {
       setStageInfo(itemData);
@@ -80,7 +83,9 @@ const PropertyInfo = () => {
 
   useEffect(() => {
     fetchProjectOverview();
-  }, [fetchProjectOverview, itemData]);
+    fetchCoverPhoto();
+  }, [fetchProjectOverview, fetchCoverPhoto, initialSelectedJob.id]);
+
 
   const fetchProjectOverview = useCallback(async () => {
     
@@ -164,6 +169,64 @@ const PropertyInfo = () => {
     [isDarkMode],
   );
 
+  const fetchCoverPhoto = useCallback(async () => {
+    setCoverPhotoLoading(true);
+
+    try {
+      const { access_token, contractor_id } = await getLoginDetails();
+      const response = await axios.post(
+        `${config.baseUrl}contractor/get-cover-photos`,
+        {
+          contractor_id: contractor_id,
+          project_id: initialSelectedJob.id,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+          },
+        },
+      );
+
+      const data = response.data;
+
+      if (data && data.success && data.data && data.data.data) {
+        // Set the cover photo from the response
+        setCoverPhoto({
+          id: data.data.data.id,
+          project_id: data.data.data.project_id,
+          project_image: data.data.data.project_image,
+          resizeimage: data.data.data.resizeimage,
+          compressimage: data.data.data.compressimage,
+          date: data.data.data.date,
+          time: data.data.data.time,
+          media_type: data.data.data.media_type,
+          notes: data.data.data.notes,
+          credit_image: data.data.data.credit_image,
+          tags: data.data.data.tags,
+          thumb_video_image: data.data.data.thumb_video_image,
+          created_by: data.data.data.created_by,
+          created_at: data.data.data.created_at,
+          updated_at: data.data.data.updated_at,
+        });
+      } else if (data && !data.success) {
+        console.warn('No cover photo found: ', data.message);
+        setCoverPhoto(null);
+      } else {
+        console.warn('Unexpected response structure: ', data);
+        setCoverPhoto(null);
+      }
+    } catch (error) {
+      console.error('Error fetching cover photo:', error);
+      Alert.alert('Error', 'Failed to load cover photo.');
+      setCoverPhoto(null);
+    } finally {
+      // Introduce a small delay to ensure the ActivityIndicator is visible
+      setTimeout(() => {
+        setCoverPhotoLoading(false);
+      }, 200); // 200ms delay (adjust as needed)
+    }
+  }, [initialSelectedJob.id]);
+
   const JobCardHeader = () => {
     const jobCard = {
       name: selectedJob.name || '',
@@ -195,6 +258,15 @@ const PropertyInfo = () => {
 
     return (
       <View style={styles.jobActivityCard}>
+        {coverPhotoLoading ? (
+          <ActivityIndicator size="large" color={Colors.primary} />
+        ) : coverPhoto ? (
+          <Image
+            source={{ uri: `${config.baseStorage}${coverPhoto.resizeimage}` }}
+            style={styles.coverPhoto}
+          />
+        ) : null}
+
         <View style={styles.rowContainer}>
           <View
             style={[
@@ -514,31 +586,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.themePlaceHolder,
   },
-  verticalStepCard: {
-    backgroundColor: Colors.white,
-    borderRadius: 12,
-    marginHorizontal: 20,
-    paddingHorizontal: 10,
-    marginBottom: 20,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    height: 400,
-  },
+ 
   jobActivityCard: {
     backgroundColor: Colors.white,
     borderRadius: 12,
     marginHorizontal: 20,
     marginVertical: 10,
-    marginBottom: 20,
+    // marginBottom: 20,
     elevation: 5,
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
+  coverPhoto: {
+    width: '100%',
+    height: 120,
+    borderRadius: 12,
+    // marginBottom: 10,
+    },
   divider: {
     height: 1,
     backgroundColor: '#ddd',

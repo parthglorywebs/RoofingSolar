@@ -21,8 +21,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y curl
 
       - name: Build APK (Replace with your actual build steps)
+        working-directory: ./app  # <----  Important: Replace with the correct path to your gradlew if it's not in the root. If it is in root, remove this line
         run: |
-          # Example: If you use Gradle
           ./gradlew assembleDebug
           mv app/build/outputs/apk/debug/app-debug.apk app-debug.apk # rename for easy reference
 
@@ -56,7 +56,7 @@ jobs:
           BREVO_PORT: 587
           BREVO_USERNAME: "86daf4001@smtp-brevo.com"
           BREVO_PASSWORD: "9HUFhqYPs4xgNJAc"
-          RECIPIENT_EMAIL: "parthm@glorywebsdev.com"  # For testing
+          RECIPIENT_EMAIL: "parthglory2025@gmail.com"  # For testing
           SENDER_EMAIL: "parthglory2025@gmail.com"  # Verified Sender in Brevo
 
         run: |

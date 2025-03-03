@@ -1,4 +1,4 @@
-name: Build and Send APK
+name: Build and Send APK (Diawi)
 
 on:
   push:
@@ -17,6 +17,36 @@ jobs:
         with:
           node-version: '18'  # Specific Node.js version for consistency
 
+      - name: Install curl
+        run: sudo apt-get update && sudo apt-get install -y curl
+
+      - name: Build APK (Replace with your actual build steps)
+        run: |
+          # Example: If you use Gradle
+          ./gradlew assembleDebug
+          mv app/build/outputs/apk/debug/app-debug.apk app-debug.apk # rename for easy reference
+
+      - name: Upload APK to Diawi
+        env:
+          DIAWI_API_TOKEN: ${{ secrets.DIAWI_API_TOKEN }}
+        run: |
+          response=$(curl -F "file=@app-debug.apk" \
+                       -F "token=$DIAWI_API_TOKEN" \
+                       -F "installation=1" \
+                       https://upload.diawi.com/ 2>&1) # Redirect stderr to stdout for error capture
+
+          echo "Diawi Response: $response"
+
+          DIAWI_LINK=$(echo "$response" | grep -oP '(?<="link":"\s*")[^"]+') # Extract the link from json
+          if [[ -z "$DIAWI_LINK" ]]; then
+            echo "❌ Failed to extract Diawi link.  Check the response from Diawi for errors."
+            echo "$response"
+            exit 1  # Fail the workflow
+          else
+            echo "✅ Diawi Link: $DIAWI_LINK"
+            echo "DIAWI_LINK=$DIAWI_LINK" >> $GITHUB_ENV # Make it available as env var for subsequent steps
+          fi
+
       - name: Install Dependencies
         run: npm install nodemailer
 
@@ -26,19 +56,15 @@ jobs:
           BREVO_PORT: 587
           BREVO_USERNAME: "86daf4001@smtp-brevo.com"
           BREVO_PASSWORD: "9HUFhqYPs4xgNJAc"
-          RECIPIENT_EMAIL: "vivek@glorywebs.com"  # For testing
+          RECIPIENT_EMAIL: "parthm@glorywebsdev.com"  # For testing
           SENDER_EMAIL: "parthglory2025@gmail.com"  # Verified Sender in Brevo
-          GITHUB_RUN_ID: ${{ github.run_id }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
 
         run: |
           node <<EOF
           const nodemailer = require('nodemailer');
 
           async function main() {
-            const GITHUB_RUN_ID = process.env.GITHUB_RUN_ID;
-            const REPO = process.env.GITHUB_REPOSITORY;
-            const APK_LINK = \`https://github.com/\${REPO}/actions/runs/\${GITHUB_RUN_ID}/artifacts\`;
+            const DIAWI_LINK = process.env.DIAWI_LINK;
 
             let transporter = nodemailer.createTransport({
               host: process.env.BREVO_HOST,
@@ -58,8 +84,8 @@ jobs:
               from: \`"GitHub Actions" <\${process.env.SENDER_EMAIL}>\`,
               to: process.env.RECIPIENT_EMAIL,
               subject: "Your APK is Ready!",
-              text: \`Download your APK here: \${APK_LINK}\`,
-              html: \`<p>Your APK is ready! Click below to download:</p><a href="\${APK_LINK}">\${APK_LINK}</a>\`,
+              text: \`Download your APK here: \${DIAWI_LINK}\`,
+              html: \`<p>Your APK is ready! Click below to download:</p><a href="\${DIAWI_LINK}">Download APK</a>\`,
             });
 
             console.log("✅ Email sent: %s", info.messageId);

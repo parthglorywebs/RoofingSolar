@@ -22,8 +22,14 @@ jobs:
 
       - name: Build APK (Debug) # or assembleRelease for production
         id: build_apk
-        working-directory: ./  # Explicitly set the working directory (usually the root)
+        working-directory: ./  # Adjust this to the directory containing gradlew
         run: |
+          # Print current working directory for debugging
+          pwd
+
+          # List contents of the working directory for debugging
+          ls -l
+
           # Make sure gradlew is executable
           chmod +x gradlew
 

@@ -26,8 +26,8 @@ jobs:
           BREVO_PORT: 587
           BREVO_USERNAME: "86daf4001@smtp-brevo.com"
           BREVO_PASSWORD: "9HUFhqYPs4xgNJAc"
-          RECIPIENT_EMAIL: "parthglory2025@gmail.com"  # For testing
-          SENDER_EMAIL: "parthglory2025@gmail.com"  # Verified Sender in Brevo
+          RECIPIENT_EMAIL: "bhagyesh.glorywebsdev@gmail.com"  # For testing
+          SENDER_EMAIL: "bhagyesh.glorywebsdev@gmail.com"  # Verified Sender in Brevo
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_REPOSITORY: ${{ github.repository }}
 

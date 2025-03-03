@@ -1,11 +1,11 @@
-name: Build and Send Debug APK
+name: Build and Send APK
 
 on:
   push:
     branches: [dev]
 
 jobs:
-  build_apk:
+  build_and_upload_apk:
     runs-on: ubuntu-latest
 
     steps:
@@ -15,57 +15,74 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '18'  # Specific Node.js version for consistency
 
       - name: Install Dependencies
         run: npm install nodemailer
 
-      - name: Check Directory Structure
-        run: ls -al
-
-      - name: Build Debug APK
+      - name: Build APK (Debug) # or assembleRelease for production
+        id: build_apk
         run: |
-          cd android
-          ./gradlew assembleDebug
+          # Assuming you're using Gradle. Adjust command as needed.
+          ./gradlew assembleDebug # or assembleRelease
+          echo "APK_PATH=android/app/build/outputs/apk/debug/app-debug.apk" >> $GITHUB_ENV
+          echo "::set-output name=apk_built::true" # Set output variable
 
-      - name: Check APK File
-        run: ls -al android/app/build/outputs/apk/debug
-
-      - name: Upload Debug APK to AppHost
-        id: upload_apk_to_apphost
+      - name: Upload APK to AppHost
+        if: steps.build_apk.outputs.apk_built == 'true'
+        env:
+          APK_PATH: ${{ env.APK_PATH }}
+        shell: /usr/bin/bash -e {0}
         run: |
-          APK_PATH="android/app/build/outputs/apk/debug/app-debug.apk"
+          # Install jq
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+          # List directory contents for debugging (optional)
+          echo "Listing APK directory..."
+          ls -l android/app/build/outputs/apk/debug/
+
           echo "Uploading APK to AppHost..."
 
-          RESPONSE=$(curl -s -F "file=@$APK_PATH" https://upload.appho.st)
-          
-          echo "AppHost Response: $RESPONSE"
+          # Retry logic (attempt up to 3 times)
+          for i in {1..3}; do
+            RESPONSE=$(curl -s -F "file=@$APK_PATH" https://upload.appho.st)
 
-          APPHOST_LINK=$(echo $RESPONSE | jq -r '.url')
-          
-          if [ "$APPHOST_LINK" == "null" ]; then
-            echo "❌ Error uploading APK to AppHost!"
-            exit 1
-          fi
-          
-          echo "✅ APK uploaded! Link: $APPHOST_LINK"
-          echo "APPHOST_LINK=$APPHOST_LINK" >> $GITHUB_ENV
+            echo "AppHost Response (attempt $i): $RESPONSE"
 
+            APPHOST_LINK=$(echo "$RESPONSE" | jq -r '.url')
+
+            if [ "$APPHOST_LINK" != "null" ]; then
+              echo "✅ APK uploaded! Link: $APPHOST_LINK"
+              echo "APPHOST_LINK=$APPHOST_LINK" >> $GITHUB_ENV
+              break # Exit the loop if successful
+            else
+              echo "❌ Error uploading APK to AppHost (attempt $i)! Response: $RESPONSE"
+              if [ $i -eq 3 ]; then
+                echo "❌ Max retries reached. Exiting."
+                exit 1
+              fi
+              echo "Retrying in 5 seconds..."
+              sleep 5
+            fi
+          done
+        # This step will run regardless of success or failure of previous steps, but it's important for proper email delivery.
       - name: Send Email with Brevo SMTP
+        if: always() # Ensures email is sent regardless of prior step success/failure
         env:
           BREVO_HOST: "smtp-relay.brevo.com"
           BREVO_PORT: 587
-          BREVO_USERNAME: ${{ secrets.BREVO_USERNAME }}
-          BREVO_PASSWORD: ${{ secrets.BREVO_PASSWORD }}
-          RECIPIENT_EMAIL: "parthglory2025@gmail.com"
-          SENDER_EMAIL: "parthglory2025@gmail.com"
-
+          BREVO_USERNAME: "86daf4001@smtp-brevo.com"
+          BREVO_PASSWORD: "9HUFhqYPs4xgNJAc"
+          RECIPIENT_EMAIL: "vivek@glorywebs.com"  # For testing
+          SENDER_EMAIL: "parthglory2025@gmail.com"  # Verified Sender in Brevo
         run: |
           node <<EOF
           const nodemailer = require('nodemailer');
 
           async function main() {
-            const APK_LINK = process.env.APPHOST_LINK; 
+            const APPHOST_LINK = process.env.APPHOST_LINK || "No link available (build or upload failed)"; // Use link, or fallback
+            const success = process.env.APPHOST_LINK ? true : false;
 
             let transporter = nodemailer.createTransport({
               host: process.env.BREVO_HOST,
@@ -84,9 +101,9 @@ jobs:
             let info = await transporter.sendMail({
               from: \`"GitHub Actions" <\${process.env.SENDER_EMAIL}>\`,
               to: process.env.RECIPIENT_EMAIL,
-              subject: "Your Debug APK is Ready!",
-              text: \`Download your Debug APK here: \${APK_LINK}\`,
-              html: \`<p>Your Debug APK is ready! Click below to download:</p><a href="\${APK_LINK}">\${APK_LINK}</a>\`,
+              subject: success ? "Your APK is Ready!" : "APK Build/Upload Failed",
+              text: success ? \`Download your APK here: \${APPHOST_LINK}\` : "APK build or upload to AppHost failed. Check the workflow logs for details.",
+              html: success ? \`<p>Your APK is ready! Click below to download:</p><a href="\${APPHOST_LINK}">\${APPHOST_LINK}</a>\` : "<p>APK build or upload to AppHost failed. Check the workflow logs for details.</p>",
             });
 
             console.log("✅ Email sent: %s", info.messageId);

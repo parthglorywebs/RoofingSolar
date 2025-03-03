@@ -1,13 +1,12 @@
-name: Build and Send APK
+name: Debug APK Link
 
 on:
   push:
     branches: [dev]
 
 jobs:
-  build_apk:
+  debug_link:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -17,70 +16,23 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Install Dependencies
-        run: npm install nodemailer
-
       - name: Build APK
         run: |
           echo "Building APK..."
           mkdir -p app/build/outputs/apk/debug
-          touch app/build/outputs/apk/debug/app-debug.apk
+          touch app/build/outputs/apk/debug/app-debug.apk  # Replace with your actual build commands
 
-      # Upload to a hosting service (example using curl and a dummy server)
-      - name: Upload APK
+      - name: Upload APK (If Using Hosting Service)
         run: |
           # Replace with actual upload command to your preferred hosting service
           # For example, if you're using a service that allows curl uploads:
           # curl -F "file=@app/build/outputs/apk/debug/app-debug.apk" https://example.com/upload
           echo "Uploading APK to hosting service..."
-          APK_URL="https://example.com/app-debug.apk"  # Replace with actual URL after upload
+          # Add your curl command here
+          #  and set APK_URL
+          APK_URL="YOUR_MANUALLY_VERIFIED_LINK" # Test with manually created link from point #1
           echo "APK_URL=$APK_URL" >> $GITHUB_ENV
 
-      - name: Send Email with Brevo SMTP
-        env:
-          BREVO_HOST: "smtp-relay.brevo.com"
-          BREVO_PORT: 587
-          BREVO_USERNAME: ${{ secrets.BREVO_USERNAME }}
-          BREVO_PASSWORD: ${{ secrets.BREVO_PASSWORD }}
-          RECIPIENT_EMAIL: "parthglory2025@gmail.com"
-          SENDER_EMAIL: "parthglory2025@gmail.com"
-          # GITHUB_RUN_ID: ${{ github.run_id }}  # Not needed anymore
-          GITHUB_REPOSITORY: ${{ github.repository }}
-
+      - name: Print the APK URL
         run: |
-          node <<EOF
-          const nodemailer = require('nodemailer');
-
-          async function main() {
-            const APK_LINK = process.env.APK_URL;  // Get the URL from the previous step
-
-            let transporter = nodemailer.createTransport({
-              host: process.env.BREVO_HOST,
-              port: process.env.BREVO_PORT,
-              secure: false,
-              auth: {
-                user: process.env.BREVO_USERNAME,
-                pass: process.env.BREVO_PASSWORD,
-              },
-              tls: {
-                ciphers: 'SSLv3',
-                rejectUnauthorized: false
-              }
-            });
-
-            let info = await transporter.sendMail({
-              from: \`"GitHub Actions" <\${process.env.SENDER_EMAIL}>\`,
-              to: process.env.RECIPIENT_EMAIL,
-              subject: "Your APK is Ready!",
-              text: \`Download your APK here: \${APK_LINK}\`,
-              html: \`<p>Your APK is ready! Click below to download:</p><a href="\${APK_LINK}">\${APK_LINK}</a>\`,
-            });
-
-            console.log("✅ Email sent: %s", info.messageId);
-          }
-
-          main().catch((error) => {
-            console.error("❌ Error sending email:", error);
-            process.exit(1);
-          });
-          EOF
+          echo "The APK URL is: ${{ env.APK_URL }}"

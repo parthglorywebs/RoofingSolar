@@ -15,20 +15,36 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'  # Specific Node.js version for consistency
+          node-version: '18'
 
       - name: Install Dependencies
         run: npm install nodemailer
+
+      - name: Build APK
+        run: |
+          echo "Building APK..."
+          mkdir -p app/build/outputs/apk/debug
+          touch app/build/outputs/apk/debug/app-debug.apk
+
+      # Upload to a hosting service (example using curl and a dummy server)
+      - name: Upload APK
+        run: |
+          # Replace with actual upload command to your preferred hosting service
+          # For example, if you're using a service that allows curl uploads:
+          # curl -F "file=@app/build/outputs/apk/debug/app-debug.apk" https://example.com/upload
+          echo "Uploading APK to hosting service..."
+          APK_URL="https://example.com/app-debug.apk"  # Replace with actual URL after upload
+          echo "APK_URL=$APK_URL" >> $GITHUB_ENV
 
       - name: Send Email with Brevo SMTP
         env:
           BREVO_HOST: "smtp-relay.brevo.com"
           BREVO_PORT: 587
-          BREVO_USERNAME: "86daf4001@smtp-brevo.com"
-          BREVO_PASSWORD: "9HUFhqYPs4xgNJAc"
-          RECIPIENT_EMAIL: "parthglory2025@gmail.com"  # For testing
-          SENDER_EMAIL: "parthglory2025@gmail.com"  # Verified Sender in Brevo
-          GITHUB_RUN_ID: ${{ github.run_id }}
+          BREVO_USERNAME: ${{ secrets.BREVO_USERNAME }}
+          BREVO_PASSWORD: ${{ secrets.BREVO_PASSWORD }}
+          RECIPIENT_EMAIL: "parthglory2025@gmail.com"
+          SENDER_EMAIL: "parthglory2025@gmail.com"
+          # GITHUB_RUN_ID: ${{ github.run_id }}  # Not needed anymore
           GITHUB_REPOSITORY: ${{ github.repository }}
 
         run: |
@@ -36,9 +52,7 @@ jobs:
           const nodemailer = require('nodemailer');
 
           async function main() {
-            const GITHUB_RUN_ID = process.env.GITHUB_RUN_ID;
-            const REPO = process.env.GITHUB_REPOSITORY;
-            const APK_LINK = \`https://github.com/\${REPO}/actions/runs/\${GITHUB_RUN_ID}/artifacts\`;
+            const APK_LINK = process.env.APK_URL;  // Get the URL from the previous step
 
             let transporter = nodemailer.createTransport({
               host: process.env.BREVO_HOST,

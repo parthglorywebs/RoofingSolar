@@ -39,47 +39,45 @@ jobs:
           fi
         shell: /usr/bin/bash -e {0}
 
-      - name: Upload APK to Upload.app
+      - name: Upload APK to App Center
         if: steps.build_apk.outputs.apk_built == 'true'
         env:
+          APP_CENTER_TOKEN: ${{ secrets.APP_CENTER_TOKEN }}
           APK_PATH: ${{ env.APK_PATH }}
-        shell: /usr/bin/bash -e {0}
+          APP_CENTER_OWNER_NAME: "YourAppCenterOwnerName"  # Replace with your App Center owner name
+          APP_CENTER_APP_NAME: "YourAppCenterAppName"  # Replace with your App Center app name
+          RELEASE_NOTES: "Automatically built and deployed from GitHub Actions."
         run: |
-          # Install jq
-          sudo apt-get update
-          sudo apt-get install -y jq
+          # Install App Center CLI
+          sudo npm install -g appcenter-cli
 
-          # List directory contents for debugging (optional)
-          echo "Listing APK directory..."
-          ls -l android/app/build/outputs/apk/debug/
+          # Configure App Center CLI
+          appcenter login --token $APP_CENTER_TOKEN
 
-          echo "Uploading APK to Upload.app..."
+          # Upload the APK
+          appcenter distribute release --app "${APP_CENTER_OWNER_NAME}/${APP_CENTER_APP_NAME}" --file "$APK_PATH" --release-notes "$RELEASE_NOTES"
 
-          # Retry logic (attempt up to 3 times)
-          for i in {1..3}; do
-            RESPONSE=$(curl -s -F "file=@$APK_PATH" https://upload.app)
+          # Get the release ID
+          RELEASE_ID=$(appcenter distribute releases list --app "${APP_CENTER_OWNER_NAME}/${APP_CENTER_APP_NAME}" | jq -r '.[0].id')
+          echo "RELEASE_ID=$RELEASE_ID" >> $GITHUB_ENV
 
-            echo "Upload.app Response (attempt $i): $RESPONSE"
+          # Create a distribution group
+          DISTRIBUTION_GROUP="Collaborators" # Change if necessary
 
-            UPLOADAPP_LINK=$(echo "$RESPONSE" | jq -r '.url')
+          # Add the release to the distribution group
+          appcenter distribute releases add-groups --app "${APP_CENTER_OWNER_NAME}/${APP_CENTER_APP_NAME}" --id $RELEASE_ID --groups "$DISTRIBUTION_GROUP"
 
-            if [ "$UPLOADAPP_LINK" != "null" ]; then
-              echo "✅ APK uploaded! Link: $UPLOADAPP_LINK"
-              echo "UPLOADAPP_LINK=$UPLOADAPP_LINK" >> $GITHUB_ENV
-              break # Exit the loop if successful
-            else
-              echo "❌ Error uploading APK to Upload.app (attempt $i)! Response: $RESPONSE"
-              if [ $i -eq 3 ]; then
-                echo "❌ Max retries reached. Exiting."
-                exit 1
-              fi
-              echo "Retrying in 5 seconds..."
-              sleep 5
-          fi
+          # Construct the App Center install link (this is just an example, may need adjusting)
+          INSTALL_LINK="https://install.appcenter.ms/${APP_CENTER_OWNER_NAME}/${APP_CENTER_APP_NAME}"
+          echo "INSTALL_LINK=$INSTALL_LINK" >> $GITHUB_ENV
+
+          echo "✅ APK uploaded to App Center!"
         shell: /usr/bin/bash -e {0}
 
-  - name: Send Email with Brevo SMTP
+  send_email:
+    needs: build_and_upload_apk
     if: always() # Ensures email is sent regardless of prior step success/failure
+    runs-on: ubuntu-latest
     env:
       BREVO_HOST: "smtp-relay.brevo.com"
       BREVO_PORT: 587
@@ -87,41 +85,44 @@ jobs:
       BREVO_PASSWORD: "9HUFhqYPs4xgNJAc"
       RECIPIENT_EMAIL: "vivek@glorywebs.com"  # For testing
       SENDER_EMAIL: "parthglory2025@gmail.com"  # Verified Sender in Brevo
-    run: |
-      node <<EOF
-      const nodemailer = require('nodemailer');
+    steps:
+      - name: Send Email with Brevo SMTP
+        run: |
+          INSTALL_LINK="${{ env.INSTALL_LINK }}"
+          NODE_OPTIONS="--tls-min-v1.1" node <<EOF
+          const nodemailer = require('nodemailer');
 
-      async function main() {
-        const UPLOADAPP_LINK = process.env.UPLOADAPP_LINK || "No link available (build or upload failed)"; // Use link, or fallback
-        const success = process.env.UPLOADAPP_LINK ? true : false;
+          async function main() {
+            const installLink = process.env.INSTALL_LINK || "No link available (build or upload failed)"; // Use link, or fallback
+            const success = process.env.INSTALL_LINK ? true : false;
 
-        let transporter = nodemailer.createTransport({
-          host: process.env.BREVO_HOST,
-          port: process.env.BREVO_PORT,
-          secure: false,
-          auth: {
-            user: process.env.BREVO_USERNAME,
-            pass: process.env.BREVO_PASSWORD,
-          },
-          tls: {
-            ciphers: 'SSLv3',
-            rejectUnauthorized: false
+            let transporter = nodemailer.createTransport({
+              host: process.env.BREVO_HOST,
+              port: process.env.BREVO_PORT,
+              secure: false,
+              auth: {
+                user: process.env.BREVO_USERNAME,
+                pass: process.env.BREVO_PASSWORD,
+              },
+              tls: {
+                ciphers: 'SSLv3',
+                rejectUnauthorized: false
+              }
+            });
+
+            let info = await transporter.sendMail({
+              from: "GitHub Actions <${process.env.SENDER_EMAIL}>",
+              to: process.env.RECIPIENT_EMAIL,
+              subject: success ? "Your APK is Ready!" : "APK Build/Upload Failed",
+              text: success ? `Download your APK here: ${installLink}` : "APK build or upload to App Center failed. Check the workflow logs for details.",
+              html: success ? `<p>Your APK is ready! Click below to download:</p><a href="${installLink}">${installLink}</a>` : "<p>APK build or upload to App Center failed. Check the workflow logs for details.</p>",
+            });
+
+            console.log("✅ Email sent: %s", info.messageId);
           }
-        });
 
-        let info = await transporter.sendMail({
-          from: \`"GitHub Actions" <\${process.env.SENDER_EMAIL}>\`,
-          to: process.env.RECIPIENT_EMAIL,
-          subject: success ? "Your APK is Ready!" : "APK Build/Upload Failed",
-          text: success ? \`Download your APK here: \${UPLOADAPP_LINK}\` : "APK build or upload to Upload.app failed. Check the workflow logs for details.",
-          html: success ? \`<p>Your APK is ready! Click below to download:</p><a href="\${UPLOADAPP_LINK}">\${UPLOADAPP_LINK}</a>\` : "<p>APK build or upload to Upload.app failed. Check the workflow logs for details.</p>",
-        });
-
-        console.log("✅ Email sent: %s", info.messageId);
-      }
-
-      main().catch((error) => {
-        console.error("❌ Error sending email:", error);
-        process.exit(1);
-      });
-      EOF
+          main().catch((error) => {
+            console.error("❌ Error sending email:", error);
+            process.exit(1);
+          });
+          EOF

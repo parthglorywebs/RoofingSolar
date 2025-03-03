@@ -1,4 +1,4 @@
-name: Build and Send APK
+name: Build and Send APK with Google Drive Link
 
 on:
   push:
@@ -35,8 +35,7 @@ jobs:
 
       - name: Generate APK
         run: |
-          # This is a placeholder. Replace with your actual APK generation commands.
-          # For example, if you're using Gradle:
+          # Replace with your actual APK generation commands (e.g., ./gradlew assembleRelease)
           ./gradlew assembleRelease
         working-directory: ./ # Replace with your project's root directory if needed
 
@@ -47,29 +46,44 @@ jobs:
           echo "::set-output name=apk_path::$APK_PATH"
         working-directory: ./ # Replace with your project's root directory if needed
 
-      - name: Upload APK as Artifact (Debugging)
-        uses: actions/upload-artifact@v4  # UPGRADE TO v4!
+      - name: Upload APK to Google Drive
+        id: upload_to_drive
+        uses: oleg-koval/google-drive-upload@v2
         with:
-          name: apk_debug
-          path: ${{ steps.find_apk.outputs.apk_path }}
+          folderId: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+          files: ${{ steps.find_apk.outputs.apk_path }}
+          credentials: ${{ secrets.GOOGLE_DRIVE_CREDENTIALS }} # Use the credential secret
+          parentId: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+          name: app-release.apk # You can customize the name
 
-      - name: Send Email with Brevo SMTP and APK Attachment
+      - name: Get Google Drive Link
+        id: get_drive_link
+        run: |
+          # The action doesn't directly expose the shareable link.  You will need to write code to grab it.
+          # This example assumes that the google-drive-upload action outputs the file ID
+          FILE_ID=$(echo ${{ steps.upload_to_drive.outputs.ids }} | jq -r '.[0]')
+          echo "FILE_ID=$FILE_ID" >> $GITHUB_ENV
+          # Generate a shareable Google Drive link.  This requires a separate API call, which can be complex.
+          # For a simplified approach, consider using the file ID directly or instruct users to locate the file
+          # in the shared folder. This simplified example returns the Google Drive file link.
+          DRIVE_LINK="https://drive.google.com/file/d/$FILE_ID/view?usp=sharing"
+          echo "DRIVE_LINK=$DRIVE_LINK" >> $GITHUB_ENV
+          echo "::set-output name=drive_link::$DRIVE_LINK"
+
+      - name: Send Email with Brevo SMTP and Google Drive Link
         env:
           BREVO_HOST: "smtp-relay.brevo.com"
           BREVO_PORT: 587
           BREVO_USERNAME: "86daf4001@smtp-brevo.com"
           BREVO_PASSWORD: "9HUFhqYPs4xgNJAc"
-          RECIPIENT_EMAIL: "parthglory2025@gmail.com"  # For testing
-          SENDER_EMAIL: "bhagyesh.glorywebsdev@gmail.com"  # Verified Sender in Brevo
-          APK_PATH: ${{ steps.find_apk.outputs.apk_path }}
+          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}  # Get from secrets
+          SENDER_EMAIL: "parthglory2025@gmail.com"  # Verified Sender in Brevo
+          DRIVE_LINK: ${{ env.DRIVE_LINK }}
         run: |
           node <<EOF
           const nodemailer = require('nodemailer');
-          const fs = require('fs');
 
           async function main() {
-            const APK_PATH = process.env.APK_PATH;
-
             let transporter = nodemailer.createTransport({
               host: process.env.BREVO_HOST,
               port: process.env.BREVO_PORT,
@@ -88,13 +102,8 @@ jobs:
               from: \`"GitHub Actions" <\${process.env.SENDER_EMAIL}>\`,
               to: process.env.RECIPIENT_EMAIL,
               subject: "Your APK is Ready!",
-              text: "Please find the attached APK file.",
-              html: "<p>Please find the attached APK file.</p>",
-              attachments: [{
-                filename: 'app-release.apk',  // Consider making this dynamic
-                path: APK_PATH,
-                contentType: 'application/vnd.android.package-archive'
-              }]
+              text: \`Download your APK here: \${process.env.DRIVE_LINK}\`,
+              html: \`<p>Your APK is ready! Click below to download:</p><a href="\${process.env.DRIVE_LINK}">Download APK</a>\`,
             });
 
             console.log("✅ Email sent: %s", info.messageId);

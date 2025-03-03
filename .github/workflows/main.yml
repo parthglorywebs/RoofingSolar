@@ -12,6 +12,9 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: List Files in Root Directory
+        run: ls -l
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -21,7 +24,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y curl
 
       - name: Build APK (Replace with your actual build steps)
-        working-directory: ./app  # <----  Important: Replace with the correct path to your gradlew if it's not in the root. If it is in root, remove this line
+        working-directory: ./app  # <----  Important: Replace with the correct path to your gradlew or remove this line if gradlew is in the root
         run: |
           ./gradlew assembleDebug
           mv app/build/outputs/apk/debug/app-debug.apk app-debug.apk # rename for easy reference

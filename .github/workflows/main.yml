@@ -22,11 +22,23 @@ jobs:
 
       - name: Build APK (Debug) # or assembleRelease for production
         id: build_apk
+        working-directory: ./  # Explicitly set the working directory (usually the root)
         run: |
+          # Make sure gradlew is executable
+          chmod +x gradlew
+
           # Assuming you're using Gradle. Adjust command as needed.
           ./gradlew assembleDebug # or assembleRelease
-          echo "APK_PATH=android/app/build/outputs/apk/debug/app-debug.apk" >> $GITHUB_ENV
-          echo "::set-output name=apk_built::true" # Set output variable
+
+          # Check if the APK was created
+          if [ -f "android/app/build/outputs/apk/debug/app-debug.apk" ]; then
+            echo "APK_PATH=android/app/build/outputs/apk/debug/app-debug.apk" >> $GITHUB_ENV
+            echo "::set-output name=apk_built::true" # Set output variable
+          else
+            echo "❌ APK not found! Build failed or path is incorrect."
+            exit 1  # Exit the step, indicating failure
+          fi
+        shell: /usr/bin/bash -e {0}
 
       - name: Upload APK to AppHost
         if: steps.build_apk.outputs.apk_built == 'true'

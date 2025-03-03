@@ -39,8 +39,9 @@ jobs:
       - name: Upload APK to Transfer.sh
         run: |
           APK_PATH=app/build/outputs/apk/debug/app-debug.apk  # Replace with your actual APK path.
+          APK_FILENAME=$(basename "$APK_PATH") # Extract filename
           if [ -f "$APK_PATH" ]; then
-            APK_URL=$(curl --upload-file "$APK_PATH" https://transfer.sh/app-debug.apk | tee output.txt)
+            APK_URL=$(curl --upload-file "$APK_PATH" "https://transfer.sh/$APK_FILENAME" | tee output.txt)
             echo "APK_URL=$APK_URL" >> $GITHUB_ENV
           else
             echo "APK not found at $APK_PATH"

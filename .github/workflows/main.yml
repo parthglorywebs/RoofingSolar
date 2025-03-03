@@ -75,53 +75,53 @@ jobs:
               fi
               echo "Retrying in 5 seconds..."
               sleep 5
-            fi
-          done
-        # This step will run regardless of success or failure of previous steps, but it's important for proper email delivery.
-      - name: Send Email with Brevo SMTP
-        if: always() # Ensures email is sent regardless of prior step success/failure
-        env:
-          BREVO_HOST: "smtp-relay.brevo.com"
-          BREVO_PORT: 587
-          BREVO_USERNAME: "86daf4001@smtp-brevo.com"
-          BREVO_PASSWORD: "9HUFhqYPs4xgNJAc"
-          RECIPIENT_EMAIL: "vivek@glorywebs.com"  # For testing
-          SENDER_EMAIL: "parthglory2025@gmail.com"  # Verified Sender in Brevo
-        run: |
-          node <<EOF
-          const nodemailer = require('nodemailer');
+          fi
+        shell: /usr/bin/bash -e {0}
 
-          async function main() {
-            const UPLOADAPP_LINK = process.env.UPLOADAPP_LINK || "No link available (build or upload failed)"; // Use link, or fallback
-            const success = process.env.UPLOADAPP_LINK ? true : false;
+  - name: Send Email with Brevo SMTP
+    if: always() # Ensures email is sent regardless of prior step success/failure
+    env:
+      BREVO_HOST: "smtp-relay.brevo.com"
+      BREVO_PORT: 587
+      BREVO_USERNAME: "86daf4001@smtp-brevo.com"
+      BREVO_PASSWORD: "9HUFhqYPs4xgNJAc"
+      RECIPIENT_EMAIL: "vivek@glorywebs.com"  # For testing
+      SENDER_EMAIL: "parthglory2025@gmail.com"  # Verified Sender in Brevo
+    run: |
+      node <<EOF
+      const nodemailer = require('nodemailer');
 
-            let transporter = nodemailer.createTransport({
-              host: process.env.BREVO_HOST,
-              port: process.env.BREVO_PORT,
-              secure: false,
-              auth: {
-                user: process.env.BREVO_USERNAME,
-                pass: process.env.BREVO_PASSWORD,
-              },
-              tls: {
-                ciphers: 'SSLv3',
-                rejectUnauthorized: false
-              }
-            });
+      async function main() {
+        const UPLOADAPP_LINK = process.env.UPLOADAPP_LINK || "No link available (build or upload failed)"; // Use link, or fallback
+        const success = process.env.UPLOADAPP_LINK ? true : false;
 
-            let info = await transporter.sendMail({
-              from: \`"GitHub Actions" <\${process.env.SENDER_EMAIL}>\`,
-              to: process.env.RECIPIENT_EMAIL,
-              subject: success ? "Your APK is Ready!" : "APK Build/Upload Failed",
-              text: success ? \`Download your APK here: \${UPLOADAPP_LINK}\` : "APK build or upload to Upload.app failed. Check the workflow logs for details.",
-              html: success ? \`<p>Your APK is ready! Click below to download:</p><a href="\${UPLOADAPP_LINK}">\${UPLOADAPP_LINK}</a>\` : "<p>APK build or upload to Upload.app failed. Check the workflow logs for details.</p>",
-            });
-
-            console.log("✅ Email sent: %s", info.messageId);
+        let transporter = nodemailer.createTransport({
+          host: process.env.BREVO_HOST,
+          port: process.env.BREVO_PORT,
+          secure: false,
+          auth: {
+            user: process.env.BREVO_USERNAME,
+            pass: process.env.BREVO_PASSWORD,
+          },
+          tls: {
+            ciphers: 'SSLv3',
+            rejectUnauthorized: false
           }
+        });
 
-          main().catch((error) => {
-            console.error("❌ Error sending email:", error);
-            process.exit(1);
-          });
-          EOF
+        let info = await transporter.sendMail({
+          from: \`"GitHub Actions" <\${process.env.SENDER_EMAIL}>\`,
+          to: process.env.RECIPIENT_EMAIL,
+          subject: success ? "Your APK is Ready!" : "APK Build/Upload Failed",
+          text: success ? \`Download your APK here: \${UPLOADAPP_LINK}\` : "APK build or upload to Upload.app failed. Check the workflow logs for details.",
+          html: success ? \`<p>Your APK is ready! Click below to download:</p><a href="\${UPLOADAPP_LINK}">\${UPLOADAPP_LINK}</a>\` : "<p>APK build or upload to Upload.app failed. Check the workflow logs for details.</p>",
+        });
+
+        console.log("✅ Email sent: %s", info.messageId);
+      }
+
+      main().catch((error) => {
+        console.error("❌ Error sending email:", error);
+        process.exit(1);
+      });
+      EOF

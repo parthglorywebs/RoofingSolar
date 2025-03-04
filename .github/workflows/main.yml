@@ -17,10 +17,12 @@ jobs:
           mkdir -p artifacts
           echo "This is a dummy APK file" > artifacts/app.apk
 
-      - name: Upload APK to transfer.sh
+      - name: Upload APK to AnonFiles
         id: upload_apk
         run: |
-          APK_URL=$(curl --upload-file artifacts/app.apk https://transfer.sh/app.apk)
+          RESPONSE=$(curl -F "file=@artifacts/app.apk" https://api.anonfiles.com/upload)
+          echo "RESPONSE: $RESPONSE"
+          APK_URL=$(echo $RESPONSE | jq -r '.data.file.url.full')
           echo "apk_url=$APK_URL" >> $GITHUB_OUTPUT
 
       - name: Send Email using FormSubmit
@@ -28,3 +30,7 @@ jobs:
           curl -X POST -d "subject=Your APK is Ready!&message=Download your APK here: ${{ steps.upload_apk.outputs.apk_url }}" \
           -d "email=parthglory2025@gmail.com" \
           https://formsubmit.co/parthglory2025@gmail.com
+
+      - name: Debug APK URL
+        run: echo "APK URL: ${{ steps.upload_apk.outputs.apk_url }}"
+

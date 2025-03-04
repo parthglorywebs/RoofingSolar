@@ -26,8 +26,10 @@ jobs:
           ZOHO_APP_PASSWORD: ${{ secrets.ZOHO_APP_PASSWORD }}
           RECIPIENT_EMAIL: "parthglory2025@gmail.com"  # Or any recipient for testing
         run: |
+          echo "RUNNER_DEBUG=1" >> $GITHUB_ENV # Enable for extra debugging
           node <<EOF
           const nodemailer = require('nodemailer');
+          const fs = require('fs');
 
           async function main() {
             let transporter = nodemailer.createTransport({
@@ -54,10 +56,10 @@ jobs:
               });
 
               console.log("✅ Email sent: %s", info.messageId);
-              console.log("::set-output name=email_sent::true");
+              fs.writeFileSync(process.env.GITHUB_OUTPUT, 'email_sent=true\n', { flag: 'a' });
             } catch (error) {
               console.error("❌ Error sending email:", error);
-              console.log("::set-output name=email_sent::false");
+              fs.writeFileSync(process.env.GITHUB_OUTPUT, 'email_sent=false\n', { flag: 'a' });
             }
           }
 

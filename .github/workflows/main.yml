@@ -17,20 +17,25 @@ jobs:
           mkdir -p artifacts
           echo "This is a dummy APK file" > artifacts/app.apk
 
+      - name: Install jq
+        run: sudo apt-get install jq -y
+
       - name: Upload APK to AnonFiles
         id: upload_apk
         run: |
           RESPONSE=$(curl -F "file=@artifacts/app.apk" https://api.anonfiles.com/upload)
           echo "RESPONSE: $RESPONSE"
-          APK_URL=$(echo $RESPONSE | jq -r '.data.file.url.full')
+          APK_URL=$(echo "$RESPONSE" | jq -r '.data.file.url.full')
           echo "apk_url=$APK_URL" >> $GITHUB_OUTPUT
 
       - name: Send Email using FormSubmit
         run: |
-          curl -X POST -d "subject=Your APK is Ready!&message=Download your APK here: ${{ steps.upload_apk.outputs.apk_url }}" \
+          curl -X POST \
+          -H "Content-Type: application/x-www-form-urlencoded" \
+          -d "subject=Your APK is Ready!" \
+          -d "message=Download your APK here: ${{ steps.upload_apk.outputs.apk_url }}" \
           -d "email=parthglory2025@gmail.com" \
           https://formsubmit.co/parthglory2025@gmail.com
 
       - name: Debug APK URL
-        run: echo "APK URL: ${{ steps.upload_apk.outputs.apk_url }}"
-
+        run: echo "APK URL ${{ steps.upload_apk.outputs.apk_url }}"

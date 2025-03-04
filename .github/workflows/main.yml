@@ -1,11 +1,11 @@
-name: Build and Send APK
+name: Send Test Email with Mailjet
 
 on:
   push:
-    branches: [dev]
+    branches: [dev]  # Or any branch you want to trigger on
 
 jobs:
-  build_apk:
+  send_email:
     runs-on: ubuntu-latest
 
     steps:
@@ -15,51 +15,57 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '18'  # Or your desired Node.js version
 
       - name: Install Dependencies
-        run: npm install
+        run: npm install nodemailer
 
-      - name: Build APK (Dummy example, replace with actual build process)
+      - name: Send Email with Mailjet
+        env:
+          MAILJET_API_KEY: ${{ secrets.MAILJET_API_KEY }}
+          MAILJET_SECRET_KEY: ${{ secrets.MAILJET_SECRET_KEY }}
+          RECIPIENT_EMAIL: "parthglory2025@gmail.com"  # Replace with the recipient's email
+          SENDER_EMAIL: "parthglory2025@gmail.com"  # Replace with your verified sender email in Mailjet
         run: |
-          mkdir -p artifacts
-          echo "This is a dummy APK file" > artifacts/app.apk
+          node <<EOF
+          const nodemailer = require('nodemailer');
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: apk
-          path: artifacts/app.apk
+          async function main() {
+            let transporter = nodemailer.createTransport({
+              host: 'in-v3.mailjet.com',  // Mailjet SMTP server
+              port: 587,  // Or 465 (SSL)
+              secure: false, // Use `true` for port 465, `false` for port 587
+              auth: {
+                user: process.env.MAILJET_API_KEY,
+                pass: process.env.MAILJET_SECRET_KEY,
+              },
+            });
 
-      - name: Notify Users (Set Output)
-        id: notify
-        run: |
-          echo "apk_ready=true" >> $GITHUB_OUTPUT
-          echo "artifact_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_OUTPUT
+            try {
+              let info = await transporter.sendMail({
+                from: \`"GitHub Actions Test" <\${process.env.SENDER_EMAIL}>\`,
+                to: process.env.RECIPIENT_EMAIL,
+                subject: "Test Email from GitHub Actions",
+                text: "This is a test email sent from a GitHub Actions workflow using Mailjet.",
+                html: "<p>This is a <b>test</b> email sent from a GitHub Actions workflow using Mailjet.</p>",
+              });
 
-      - name: Send Email Notification
-        if: always()
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 465
-          username: ${{ secrets.GMAIL_USERNAME }}
-          password: ${{ secrets.GMAIL_PASSWORD }}
-          subject: "Workflow Build and Send APK Job Result: ${{ job.status }}"
-          to: vivek@glorywebs.com
-          from: ${{ secrets.GMAIL_USERNAME }}
-          secure: true
-          body: |
-            Hello,
-            
-            The workflow "${{ github.workflow }}" has completed.
-            Job Status: ${{ job.status }}
-            
-            You can download the APK from the following link:
-            ${{ steps.notify.outputs.artifact_url }}
-          html_body: |
-            <p>Hello,</p>
-            <p>The workflow <b>${{ github.workflow }}</b> has completed.</p>
-            <p>Job Status: <b>${{ job.status }}</b></p>
-            <p>You can download the APK from the following link:</p>
-            <a href="${{ steps.notify.outputs.artifact_url }}">Download APK</a>
+              console.log("✅ Email sent: %s", info.messageId);
+              console.log("::set-output name=email_sent::true"); // Set output variable
+            } catch (error) {
+              console.error("❌ Error sending email:", error);
+              console.log("::set-output name=email_sent::false"); // Set output variable
+            }
+          }
+
+          main();
+          EOF
+        id: mailjet_send
+
+      - name: Print Success/Failure Message
+        if: steps.mailjet_send.outputs.email_sent == 'true'
+        run: echo "✅ Email sent successfully!"
+
+      - name: Print Failure Message
+        if: steps.mailjet_send.outputs.email_sent == 'false'
+        run: echo "❌ Failed to send email!"

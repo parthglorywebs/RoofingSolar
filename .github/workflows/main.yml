@@ -23,17 +23,18 @@ jobs:
           echo "This is a dummy APK file" > artifacts/app.apk
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4  # <----  UPGRADE TO V4
         with:
           name: apk
           path: artifacts/app.apk
 
       - name: Notify Users (using GitHub Actions output)
+        id: notify
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "::set-output name=apk_ready::true"
-          echo "::set-output name=artifact_url::${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo "apk_ready=true" >> $GITHUB_OUTPUT
+          echo "artifact_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_OUTPUT
 
       - name: Send Workflow Conclusion Notification
         if: always()  # Run this step regardless of the previous steps' outcome

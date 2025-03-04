@@ -1,62 +1,71 @@
-name: Send Test Email via Brevo (Node.js)
+name: Send Email with Mailjet
 
 on:
   push:
-    branches: [dev]  # Trigger on pushes to the 'dev' branch
+    branches: [dev]
 
 jobs:
   send_email:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'  # Specific Node.js version for consistency
+          node-version: '18'
 
       - name: Install Dependencies
-        run: npm install nodemailer
+        run: npm install node-mailjet
 
-      - name: Send Email with Brevo SMTP
+      - name: Send Email
         env:
-          BREVO_HOST: "smtp-relay.brevo.com"
-          BREVO_PORT: 587
-          BREVO_USERNAME: "86daf4001@smtp-brevo.com"
-          BREVO_PASSWORD: "9HUFhqYPs4xgNJAc"
-          RECIPIENT_EMAIL: "parthglory2025@gmail.com"  # For testing
-          SENDER_EMAIL: "parthglory2025@gmail.com"  # Verified Sender in Brevo
+          MAILJET_API_KEY: ${{ secrets.MAILJET_API_KEY }}
+          MAILJET_API_SECRET: ${{ secrets.MAILJET_API_SECRET }}
+          RECIPIENT_EMAIL: "vivek@glorywebs.com"  # testing email address
+          SENDER_EMAIL: "parthglory2025@gmail.com" # Must be a verified sender in Mailjet
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+
         run: |
           node <<EOF
-          const nodemailer = require('nodemailer');
-          async function main() {
-            let transporter = nodemailer.createTransport({
-              host: process.env.BREVO_HOST,
-              port: process.env.BREVO_PORT,
-              secure: true, // upgrade later with STARTTLS
-              auth: {
-                user: process.env.BREVO_USERNAME,
-                pass: process.env.BREVO_PASSWORD,
-              },
-              tls: {
-                ciphers:'SSLv3',
-                rejectUnauthorized: false // Only for testing, remove for production
+          const mailjet = require('node-mailjet').connect(
+            process.env.MAILJET_API_KEY,
+            process.env.MAILJET_API_SECRET
+          );
+
+          const GITHUB_RUN_ID = process.env.GITHUB_RUN_ID;
+          const REPO = process.env.GITHUB_REPOSITORY;
+          const APK_LINK = \`https://github.com/\${REPO}/actions/runs/\${GITHUB_RUN_ID}/artifacts\`;
+
+          const request = mailjet.post('send', { version: 'v3.1' }).request({
+            Messages: [
+              {
+                From: {
+                  Email: process.env.SENDER_EMAIL,
+                  Name: "GitHub Actions"
+                },
+                To: [
+                  {
+                    Email: process.env.RECIPIENT_EMAIL,
+                    Name: "Recipient"
+                  }
+                ],
+                Subject: "Your APK is Ready!",
+                TextPart: \`Download your APK here: \${APK_LINK}\`,
+                HTMLPart: \`<p>Your APK is ready! Click below to download:</p><a href="\${APK_LINK}">\${APK_LINK}</a>\`
               }
-            });
-            let info = await transporter.sendMail({
-              from: \`"GitHub Actions Test" <\${process.env.SENDER_EMAIL}>\`,
-              to: process.env.RECIPIENT_EMAIL,
-              subject: "Brevo SMTP Test from GitHub Actions",
-              text: "This is a test email sent via Brevo SMTP from GitHub Actions.",
-              html: "<h3>This is a test email sent via Brevo SMTP from GitHub Actions.</h3>",
-            });
-            console.log("✅ Message sent: %s", info.messageId);
-            //console.log("Preview URL: %s", nodemailer.getTestMessageUrl(info)); // For Ethereal Accounts
-          }
-          main().catch((error) => {
-            console.error("❌ Error sending email:", error);
-            process.exit(1);
+            ]
           });
+
+          request
+            .then((result) => {
+              console.log("✅ Email sent:", result.body);
+            })
+            .catch((err) => {
+              console.error("❌ Error sending email:", err.statusCode, err.message);
+              process.exit(1);
+            });
           EOF

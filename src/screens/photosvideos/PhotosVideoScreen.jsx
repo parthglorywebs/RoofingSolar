@@ -876,13 +876,26 @@ const PhotosVideoScreen = ({selectedJob}) => {
         onRequestClose={closeMediaMenu}>
         <View style={styles.modalOverlay}>
           <View style={styles.mediaMenuContainer}>
-            <TouchableOpacity
+            {/* <TouchableOpacity
               style={styles.mediaMenuItem}
               onPress={() => {
                 handleSetAsCoverPhoto();
               }}>
               <Text>Set as Cover Photo</Text>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
+            {selectedMediaForMenu &&
+                !(
+                  selectedMediaForMenu.type &&
+                  selectedMediaForMenu.type.toLowerCase().includes('video')
+                ) && (
+                  <TouchableOpacity
+                    style={styles.mediaMenuItem}
+                    onPress={() => {
+                      handleSetAsCoverPhoto();
+                    }}>
+                    <Text>Set as Cover Photo</Text>
+                  </TouchableOpacity>
+                )}
             <TouchableOpacity
               style={styles.mediaMenuItem}
               onPress={() => {

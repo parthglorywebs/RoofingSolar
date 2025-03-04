@@ -1,11 +1,11 @@
-name: Send Email with Mailjet
+name: Build and Send APK
 
 on:
   push:
     branches: [dev]
 
 jobs:
-  send_email:
+  build_apk:
     runs-on: ubuntu-latest
 
     steps:
@@ -17,55 +17,39 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Install Dependencies
-        run: npm install node-mailjet
-
-      - name: Send Email
-        env:
-          MAILJET_API_KEY: ${{ secrets.MAILJET_API_KEY }}
-          MAILJET_API_SECRET: ${{ secrets.MAILJET_API_SECRET }}
-          RECIPIENT_EMAIL: "vivek@glorywebs.com"  # testing email address
-          SENDER_EMAIL: "parthglory2025@gmail.com" # Must be a verified sender in Mailjet
-          GITHUB_RUN_ID: ${{ github.run_id }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-
+      - name: Create Artifact (Example - replace with your actual build process)
         run: |
-          node <<EOF
-          const mailjet = require('node-mailjet').connect(
-            process.env.MAILJET_API_KEY,
-            process.env.MAILJET_API_SECRET
-          );
+          mkdir -p artifacts
+          echo "This is a dummy APK file" > artifacts/app.apk
 
-          const GITHUB_RUN_ID = process.env.GITHUB_RUN_ID;
-          const REPO = process.env.GITHUB_REPOSITORY;
-          const APK_LINK = \`https://github.com/\${REPO}/actions/runs/\${GITHUB_RUN_ID}/artifacts\`;
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: apk
+          path: artifacts/app.apk
 
-          const request = mailjet.post('send', { version: 'v3.1' }).request({
-            Messages: [
-              {
-                From: {
-                  Email: process.env.SENDER_EMAIL,
-                  Name: "GitHub Actions"
-                },
-                To: [
-                  {
-                    Email: process.env.RECIPIENT_EMAIL,
-                    Name: "Recipient"
-                  }
-                ],
-                Subject: "Your APK is Ready!",
-                TextPart: \`Download your APK here: \${APK_LINK}\`,
-                HTMLPart: \`<p>Your APK is ready! Click below to download:</p><a href="\${APK_LINK}">\${APK_LINK}</a>\`
-              }
-            ]
-          });
+      - name: Notify Users (using GitHub Actions output)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "::set-output name=apk_ready::true"
+          echo "::set-output name=artifact_url::${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
-          request
-            .then((result) => {
-              console.log("✅ Email sent:", result.body);
-            })
-            .catch((err) => {
-              console.error("❌ Error sending email:", err.statusCode, err.message);
-              process.exit(1);
-            });
-          EOF
+      - name: Send Workflow Conclusion Notification
+        if: always()  # Run this step regardless of the previous steps' outcome
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{secrets.GMAIL_USERNAME}}
+          password: ${{secrets.GMAIL_PASSWORD}}
+          subject: Workflow ${{ github.workflow }} job result!
+          to: vivek@glorywebs.com
+          from: ${{secrets.GMAIL_USERNAME}}
+          body: |
+            Hello!
+            Workflow ${{ github.workflow }} job result is ${{ job.status }}.
+
+          html_body: |
+              Hello!<br>
+              Workflow <b>${{ github.workflow }}</b> job result is <b>${{ job.status }}</b>.

@@ -1,11 +1,11 @@
-name: Send Email with Node.js and Zoho Mail
+name: Build and Send APK
 
 on:
   push:
-    branches: [main]  # Change to your trigger branch
+    branches: [dev]
 
 jobs:
-  send_email:
+  build_apk:
     runs-on: ubuntu-latest
 
     steps:
@@ -15,63 +15,58 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'  # Or your desired Node.js version
+          node-version: '18'  # Specific Node.js version for consistency
 
       - name: Install Dependencies
         run: npm install nodemailer
 
-      - name: Send Email with Zoho Mail
+      - name: Send Email with Brevo SMTP
         env:
-          ZOHO_EMAIL: ${{ secrets.ZOHO_EMAIL }}
-          ZOHO_APP_PASSWORD: ${{ secrets.ZOHO_APP_PASSWORD }}
-          GITHUB_OUTPUT: ${{ github.output }}
+          BREVO_HOST: "smtp-relay.brevo.com"
+          BREVO_PORT: 587
+          BREVO_USERNAME: "86daf4001@smtp-brevo.com"
+          BREVO_PASSWORD: "9HUFhqYPs4xgNJAc"
+          RECIPIENT_EMAIL: "parthglory2025@gmail.com"  # For testing
+          SENDER_EMAIL: "parthglory2025@gmail.com"  # Verified Sender in Brevo
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+
         run: |
-          echo "RUNNER_DEBUG=1" >> $GITHUB_ENV
           node <<EOF
           const nodemailer = require('nodemailer');
-          const fs = require('fs');
 
-          async function sendEmail() {
-            try {
-              // Create a transporter object using Zoho Mail SMTP settings
-              let transporter = nodemailer.createTransport({
-                host: 'smtp.zoho.com',  // Zoho SMTP server
-                port: 587,               // Or 465 for SSL
-                secure: false,           // True for 465, false for 587
-                auth: {
-                  user: process.env.ZOHO_EMAIL,   // Your Zoho Mail email address (from environment variable)
-                  pass: process.env.ZOHO_APP_PASSWORD  // Your app password (from environment variable)
-                },
-                tls: {
-                   ciphers: 'SSLv3',
-                   rejectUnauthorized: false // Only if needed
-                }
-              });
+          async function main() {
+            const GITHUB_RUN_ID = process.env.GITHUB_RUN_ID;
+            const REPO = process.env.GITHUB_REPOSITORY;
+            const APK_LINK = \`https://github.com/\${REPO}/actions/runs/\${GITHUB_RUN_ID}/artifacts\`;
 
-              // Define the email message
-              let mailOptions = {
-                from: '"GitHub Actions Test" <' + process.env.ZOHO_EMAIL + '>', // Sender address
-                to: 'recipient@example.com',          // Recipient address
-                subject: 'Test Email from Node.js and GitHub Actions',
-                text: 'This is a test email sent from a Node.js script in GitHub Actions!',
-                html: '<p>This is a <b>test</b> email sent from a Node.js script in GitHub Actions!</p>'
-              };
+            let transporter = nodemailer.createTransport({
+              host: process.env.BREVO_HOST,
+              port: process.env.BREVO_PORT,
+              secure: false,
+              auth: {
+                user: process.env.BREVO_USERNAME,
+                pass: process.env.BREVO_PASSWORD,
+              },
+              tls: {
+                ciphers: 'SSLv3',
+                rejectUnauthorized: false
+              }
+            });
 
-              // Send the email
-              let info = await transporter.sendMail(mailOptions);
+            let info = await transporter.sendMail({
+              from: \`"GitHub Actions" <\${process.env.SENDER_EMAIL}>\`,
+              to: process.env.RECIPIENT_EMAIL,
+              subject: "Your APK is Ready!",
+              text: \`Download your APK here: \${APK_LINK}\`,
+              html: \`<p>Your APK is ready! Click below to download:</p><a href="\${APK_LINK}">\${APK_LINK}</a>\`,
+            });
 
-              console.log('✅ Email sent: %s', info.messageId);
-              fs.writeFileSync(process.env.GITHUB_OUTPUT, 'email_sent=true\n', { flag: 'a' });
-            } catch (error) {
-              console.error('❌ Error sending email: ', error);
-              fs.writeFileSync(process.env.GITHUB_OUTPUT, 'email_sent=false\n', { flag: 'a' });
-            }
+            console.log("✅ Email sent: %s", info.messageId);
           }
 
-          sendEmail();
+          main().catch((error) => {
+            console.error("❌ Error sending email:", error);
+            process.exit(1);
+          });
           EOF
-        id: send_mail_step
-
-      - name: Output Result
-        run: |
-           echo "Mail Sent: ${{ steps.send_mail_step.outputs.email_sent }}"

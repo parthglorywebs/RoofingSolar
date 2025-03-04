@@ -59,6 +59,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
 
   const [mediaMenuVisible, setMediaMenuVisible] = useState(false);
   const [selectedMediaForMenu, setSelectedMediaForMenu] = useState(null);
+  const [settingCoverPhoto, setSettingCoverPhoto] = useState(false);
 
   // Pagination states
   const [page, setPage] = useState(1); // Current page number
@@ -283,9 +284,58 @@ const PhotosVideoScreen = ({selectedJob}) => {
 
   // Function to handle setting the media as cover photo (placeholder)
   const handleSetAsCoverPhoto = () => {
-    console.log('Set as Cover Photo');
-    closeMediaMenu();
+    Alert.alert(
+      "Are you sure?",
+      "You want to set this file as cover photo!",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Yes, Set as Cover Photo!",
+          onPress: async () => {
+            setSettingCoverPhoto(true); // Show loading indicator
+            try {
+              const {access_token, contractor_id} = await getLoginDetails();
+              const response = await axios.post(
+                `${config.baseUrl}contractor/set-cover-photos`,
+                {
+                  contractor_id: contractorId,
+                  project_id: selectedJob.id,
+                  media_id: selectedMediaForMenu.mediaId,
+                },
+                {
+                  headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    Authorization: `Bearer ${access_token}`,
+                  },
+                },
+              );
+
+              console.log('API Response:', response);
+
+              if (response.data.success === true) {
+                console.log('Cover photo set successfully');
+                Alert.alert('Successfully', response.data.message);
+                // TODO: Invalidate cache of current project to force refresh cover image
+              } else {
+                Alert.alert('Error', response.data.message || 'Failed to set cover photo');
+              }
+            } catch (error) {
+              console.error('Error setting cover photo:', error);
+              Alert.alert('Error', 'Failed to set cover photo');
+            } finally {
+              setSettingCoverPhoto(false); // Hide loading indicator
+              closeMediaMenu(); // Close the menu
+              console.log("Set as Cover Photo : " +selectedMediaForMenu.mediaId, contractorId, selectedJob.id);
+            }
+          }
+        }
+      ]
+    );
   };
+
 
   const handleRemoveMedia = useCallback(
     (uri, mediaId, date) => {

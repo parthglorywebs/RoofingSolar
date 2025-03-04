@@ -39,39 +39,21 @@ jobs:
           fi
         shell: /usr/bin/bash -e {0}
 
-      - name: Upload APK to App Center
+      - name: Upload APK to Upload.app
         if: steps.build_apk.outputs.apk_built == 'true'
-        env:
-          APP_CENTER_TOKEN: ${{ secrets.APP_CENTER_TOKEN }}
-          APK_PATH: ${{ env.APK_PATH }}
-          APP_CENTER_OWNER_NAME: "YourAppCenterOwnerName"  # Replace with your App Center owner name
-          APP_CENTER_APP_NAME: "YourAppCenterAppName"  # Replace with your App Center app name
-          RELEASE_NOTES: "Automatically built and deployed from GitHub Actions."
+        id: upload_app
         run: |
-          # Install App Center CLI
-          sudo npm install -g appcenter-cli
+          # Upload the APK to upload.app
+          curl --request POST \
+            --url 'https://upload.app/api/upload' \
+            --header 'Content-Type: multipart/form-data' \
+            --form 'file=@${{ env.APK_PATH }}' > upload_response.json
 
-          # Configure App Center CLI
-          appcenter login --token $APP_CENTER_TOKEN
+          # Extract the link from the JSON response
+          UPLOAD_LINK=$(jq -r '.url' upload_response.json)
+          echo "UPLOAD_LINK=$UPLOAD_LINK" >> $GITHUB_ENV
 
-          # Upload the APK
-          appcenter distribute release --app "${APP_CENTER_OWNER_NAME}/${APP_CENTER_APP_NAME}" --file "$APK_PATH" --release-notes "$RELEASE_NOTES"
-
-          # Get the release ID
-          RELEASE_ID=$(appcenter distribute releases list --app "${APP_CENTER_OWNER_NAME}/${APP_CENTER_APP_NAME}" | jq -r '.[0].id')
-          echo "RELEASE_ID=$RELEASE_ID" >> $GITHUB_ENV
-
-          # Create a distribution group
-          DISTRIBUTION_GROUP="Collaborators" # Change if necessary
-
-          # Add the release to the distribution group
-          appcenter distribute releases add-groups --app "${APP_CENTER_OWNER_NAME}/${APP_CENTER_APP_NAME}" --id $RELEASE_ID --groups "$DISTRIBUTION_GROUP"
-
-          # Construct the App Center install link (this is just an example, may need adjusting)
-          INSTALL_LINK="https://install.appcenter.ms/${APP_CENTER_OWNER_NAME}/${APP_CENTER_APP_NAME}"
-          echo "INSTALL_LINK=$INSTALL_LINK" >> $GITHUB_ENV
-
-          echo "✅ APK uploaded to App Center!"
+          echo "✅ APK uploaded to Upload.app! Link: $UPLOAD_LINK"
         shell: /usr/bin/bash -e {0}
 
   send_email:
@@ -88,13 +70,13 @@ jobs:
     steps:
       - name: Send Email with Brevo SMTP
         run: |
-          INSTALL_LINK="${{ env.INSTALL_LINK }}"
+          INSTALL_LINK="${{ env.UPLOAD_LINK }}"
           NODE_OPTIONS="--tls-min-v1.1" node <<EOF
           const nodemailer = require('nodemailer');
 
           async function main() {
-            const installLink = process.env.INSTALL_LINK || "No link available (build or upload failed)"; // Use link, or fallback
-            const success = process.env.INSTALL_LINK ? true : false;
+            const installLink = process.env.UPLOAD_LINK || "No link available (build or upload failed)"; // Use link, or fallback
+            const success = process.env.UPLOAD_LINK ? true : false;
 
             let transporter = nodemailer.createTransport({
               host: process.env.BREVO_HOST,
@@ -114,8 +96,8 @@ jobs:
               from: "GitHub Actions <${process.env.SENDER_EMAIL}>",
               to: process.env.RECIPIENT_EMAIL,
               subject: success ? "Your APK is Ready!" : "APK Build/Upload Failed",
-              text: success ? `Download your APK here: ${installLink}` : "APK build or upload to App Center failed. Check the workflow logs for details.",
-              html: success ? `<p>Your APK is ready! Click below to download:</p><a href="${installLink}">${installLink}</a>` : "<p>APK build or upload to App Center failed. Check the workflow logs for details.</p>",
+              text: success ? `Download your APK here: ${installLink}` : "APK build or upload failed. Check the workflow logs for details.",
+              html: success ? `<p>Your APK is ready! Click below to download:</p><a href="${installLink}">${installLink}</a>` : "<p>APK build or upload failed. Check the workflow logs for details.</p>",
             });
 
             console.log("✅ Email sent: %s", info.messageId);

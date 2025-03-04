@@ -23,7 +23,7 @@ jobs:
           echo "This is a dummy APK file" > artifacts/app.apk
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v4  # <----  UPGRADE TO V4
+        uses: actions/upload-artifact@v4
         with:
           name: apk
           path: artifacts/app.apk
@@ -42,11 +42,12 @@ jobs:
         with:
           server_address: smtp.gmail.com
           server_port: 465
-          username: ${{secrets.GMAIL_USERNAME}}
-          password: ${{secrets.GMAIL_PASSWORD}}
-          subject: Workflow ${{ github.workflow }} job result!
+          server_port: 465
+          username: ${{ secrets.GMAIL_USERNAME }}  # Use secret
+          password: ${{ secrets.GMAIL_PASSWORD }}  # Use secret (App Password)
+          subject: Workflow Build and Send APK job result!
           to: vivek@glorywebs.com
-          from: ${{secrets.GMAIL_USERNAME}}
+          from: ${{ secrets.GMAIL_USERNAME }}  # Use secret
           body: |
             Hello!
             Workflow ${{ github.workflow }} job result is ${{ job.status }}.

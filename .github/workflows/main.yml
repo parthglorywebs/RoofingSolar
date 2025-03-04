@@ -17,7 +17,10 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Create Artifact (Example - replace with your actual build process)
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build APK (Dummy example, replace with actual build process)
         run: |
           mkdir -p artifacts
           echo "This is a dummy APK file" > artifacts/app.apk
@@ -28,29 +31,35 @@ jobs:
           name: apk
           path: artifacts/app.apk
 
-      - name: Notify Users (using GitHub Actions output)
+      - name: Notify Users (Set Output)
         id: notify
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "apk_ready=true" >> $GITHUB_OUTPUT
           echo "artifact_url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_OUTPUT
 
-      - name: Send Workflow Conclusion Notification
-        if: always()  # Run this step regardless of the previous steps' outcome
+      - name: Send Email Notification
+        if: always()
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
           server_port: 465
-          username: ${{ secrets.GMAIL_USERNAME }}  # Use secret
-          password: ${{ secrets.GMAIL_PASSWORD }}  # Use secret (App Password)
-          subject: Workflow Build and Send APK job result!
+          username: ${{ secrets.GMAIL_USERNAME }}
+          password: ${{ secrets.GMAIL_PASSWORD }}
+          subject: "Workflow Build and Send APK Job Result: ${{ job.status }}"
           to: vivek@glorywebs.com
-          from: ${{ secrets.GMAIL_USERNAME }}  # Use secret
+          from: ${{ secrets.GMAIL_USERNAME }}
+          secure: true
           body: |
-            Hello!
-            Workflow ${{ github.workflow }} job result is ${{ job.status }}.
-
+            Hello,
+            
+            The workflow "${{ github.workflow }}" has completed.
+            Job Status: ${{ job.status }}
+            
+            You can download the APK from the following link:
+            ${{ steps.notify.outputs.artifact_url }}
           html_body: |
-              Hello!<br>
-              Workflow <b>${{ github.workflow }}</b> job result is <b>${{ job.status }}</b>.
+            <p>Hello,</p>
+            <p>The workflow <b>${{ github.workflow }}</b> has completed.</p>
+            <p>Job Status: <b>${{ job.status }}</b></p>
+            <p>You can download the APK from the following link:</p>
+            <a href="${{ steps.notify.outputs.artifact_url }}">Download APK</a>

@@ -42,7 +42,6 @@ jobs:
         with:
           server_address: smtp.gmail.com
           server_port: 465
-          server_port: 465
           username: ${{ secrets.GMAIL_USERNAME }}  # Use secret
           password: ${{ secrets.GMAIL_PASSWORD }}  # Use secret (App Password)
           subject: Workflow Build and Send APK job result!

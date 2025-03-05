@@ -86,9 +86,7 @@ const PropertyInfo = () => {
     fetchCoverPhoto();
   }, [fetchProjectOverview, fetchCoverPhoto, initialSelectedJob.id]);
 
-
   const fetchProjectOverview = useCallback(async () => {
-    
     try {
       setLoading(true);
       const {access_token, contractor_id} = await getLoginDetails();
@@ -173,7 +171,7 @@ const PropertyInfo = () => {
     setCoverPhotoLoading(true);
 
     try {
-      const { access_token, contractor_id } = await getLoginDetails();
+      const {access_token, contractor_id} = await getLoginDetails();
       const response = await axios.post(
         `${config.baseUrl}contractor/get-cover-photos`,
         {
@@ -262,7 +260,7 @@ const PropertyInfo = () => {
           <ActivityIndicator size="large" color={Colors.primary} />
         ) : coverPhoto ? (
           <Image
-            source={{ uri: `${config.baseStorage}${coverPhoto.resizeimage}` }}
+            source={{uri: `${config.baseStorage}${coverPhoto.resizeimage}`}}
             style={styles.coverPhoto}
           />
         ) : null}
@@ -393,7 +391,11 @@ const PropertyInfo = () => {
 
             // You can return any component that you like here!
             return (
-              <MaterialCommunityIcons name={iconName} size={size} color={color} />
+              <MaterialCommunityIcons
+                name={iconName}
+                size={size}
+                color={color}
+              />
             );
           },
           tabBarActiveTintColor: Colors.primary,
@@ -435,16 +437,16 @@ const PropertyInfo = () => {
           }}
           children={() => (
             <ScrollView>
-            <OverviewComponent
-              projectOverviewData={projectOverviewData}
-              milestoneData={milestoneData}
-              currentPosition={currentPosition}
-              generalInformation={generalInformation}
-              jobActivity={jobActivity}
-              selectedJob={selectedJob}
-              itemData={itemData}
-            />
-            </ScrollView> 
+              <OverviewComponent
+                projectOverviewData={projectOverviewData}
+                milestoneData={milestoneData}
+                currentPosition={currentPosition}
+                generalInformation={generalInformation}
+                jobActivity={jobActivity}
+                selectedJob={selectedJob}
+                itemData={itemData}
+              />
+            </ScrollView>
           )}
         />
         <Tab.Screen
@@ -525,7 +527,7 @@ const styles = StyleSheet.create({
     height: 120,
     borderRadius: 12,
     // marginBottom: 10,
-    },
+  },
   divider: {
     height: 1,
     backgroundColor: '#ddd',

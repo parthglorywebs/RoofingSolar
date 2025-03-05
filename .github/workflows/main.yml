@@ -20,14 +20,14 @@ jobs:
       - name: Install Dependencies
         run: npm install nodemailer
 
-      - name: Send Email with Brevo SMTP
+      - name: Send Email with Mailbluster SMTP
         env:
-          BREVO_HOST: "smtp-relay.brevo.com"
-          BREVO_PORT: 587
-          BREVO_USERNAME: "86daf4001@smtp-brevo.com"
-          BREVO_PASSWORD: "9HUFhqYPs4xgNJAc"
+          MAILBLUSTER_HOST: "smtp.mailbluster.com"  # Mailbluster SMTP Host
+          MAILBLUSTER_PORT: 587 # Mailbluster SMTP Port
+          MAILBLUSTER_USERNAME: "parthglory2025@gmail.com" # Replace with your Mailbluster username
+          MAILBLUSTER_PASSWORD: "Glory@123" # Replace with your Mailbluster password
           RECIPIENT_EMAIL: "parthglory2025@gmail.com"  # For testing
-          SENDER_EMAIL: "parthglory2025@gmail.com"  # Verified Sender in Brevo
+          SENDER_EMAIL: "parthglory2025@gmail.com"  # Verified Sender in Mailbluster
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_REPOSITORY: ${{ github.repository }}
 
@@ -41,16 +41,16 @@ jobs:
             const APK_LINK = \`https://github.com/\${REPO}/actions/runs/\${GITHUB_RUN_ID}/artifacts\`;
 
             let transporter = nodemailer.createTransport({
-              host: process.env.BREVO_HOST,
-              port: process.env.BREVO_PORT,
+              host: process.env.MAILBLUSTER_HOST,
+              port: process.env.MAILBLUSTER_PORT,
               secure: false,
               auth: {
-                user: process.env.BREVO_USERNAME,
-                pass: process.env.BREVO_PASSWORD,
+                user: process.env.MAILBLUSTER_USERNAME,
+                pass: process.env.MAILBLUSTER_PASSWORD,
               },
               tls: {
-                ciphers: 'SSLv3',
-                rejectUnauthorized: false
+                ciphers: 'SSLv3', // Adjust cipher if needed by Mailbluster
+                rejectUnauthorized: false  // Consider removing this in production if possible, but needed for some SMTP servers
               }
             });
 

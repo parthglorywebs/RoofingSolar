@@ -1,4 +1,4 @@
-name: Build, Upload, and Send APK
+name: Build and Send APK
 
 on:
   push:
@@ -12,30 +12,61 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Create Dummy APK File
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'  # Specific Node.js version for consistency
+
+      - name: Install Dependencies
+        run: npm install nodemailer
+
+      - name: Send Email with Brevo SMTP
+        env:
+          BREVO_HOST: "smtp-relay.brevo.com"
+          BREVO_PORT: 587
+          BREVO_USERNAME: "86daf4001@smtp-brevo.com"
+          BREVO_PASSWORD: "9HUFhqYPs4xgNJAc"
+          RECIPIENT_EMAIL: "parthglory2025@gmail.com"  # For testing
+          SENDER_EMAIL: "parthglory2025@gmail.com"  # Verified Sender in Brevo
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+
         run: |
-          mkdir -p artifacts
-          echo "This is a dummy APK file" > artifacts/app.apk
+          node <<EOF
+          const nodemailer = require('nodemailer');
 
-      - name: Install jq
-        run: sudo apt-get install jq -y
+          async function main() {
+            const GITHUB_RUN_ID = process.env.GITHUB_RUN_ID;
+            const REPO = process.env.GITHUB_REPOSITORY;
+            const APK_LINK = \`https://github.com/\${REPO}/actions/runs/\${GITHUB_RUN_ID}/artifacts\`;
 
-      - name: Upload APK to AnonFiles
-        id: upload_apk
-        run: |
-          RESPONSE=$(curl -F "file=@artifacts/app.apk" https://api.anonfiles.com/upload)
-          echo "RESPONSE: $RESPONSE"
-          APK_URL=$(echo "$RESPONSE" | jq -r '.data.file.url.full')
-          echo "apk_url=$APK_URL" >> $GITHUB_OUTPUT
+            let transporter = nodemailer.createTransport({
+              host: process.env.BREVO_HOST,
+              port: process.env.BREVO_PORT,
+              secure: false,
+              auth: {
+                user: process.env.BREVO_USERNAME,
+                pass: process.env.BREVO_PASSWORD,
+              },
+              tls: {
+                ciphers: 'SSLv3',
+                rejectUnauthorized: false
+              }
+            });
 
-      - name: Send Email using FormSubmit
-        run: |
-          curl -X POST \
-          -H "Content-Type: application/x-www-form-urlencoded" \
-          -d "subject=Your APK is Ready!" \
-          -d "message=Download your APK here: ${{ steps.upload_apk.outputs.apk_url }}" \
-          -d "email=parthglory2025@gmail.com" \
-          https://formsubmit.co/parthglory2025@gmail.com
+            let info = await transporter.sendMail({
+              from: \`"GitHub Actions" <\${process.env.SENDER_EMAIL}>\`,
+              to: process.env.RECIPIENT_EMAIL,
+              subject: "Your APK is Ready!",
+              text: \`Download your APK here: \${APK_LINK}\`,
+              html: \`<p>Your APK is ready! Click below to download:</p><a href="\${APK_LINK}">\${APK_LINK}</a>\`,
+            });
 
-      - name: Debug APK URL
-        run: echo "APK URL ${{ steps.upload_apk.outputs.apk_url }}"
+            console.log("✅ Email sent: %s", info.messageId);
+          }
+
+          main().catch((error) => {
+            console.error("❌ Error sending email:", error);
+            process.exit(1);
+          });
+          EOF

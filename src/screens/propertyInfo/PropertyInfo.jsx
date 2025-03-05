@@ -508,85 +508,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  stepIndicatorContainer: {
-    marginTop: 10,
-    paddingHorizontal: 15,
-    zIndex: 1,
-  },
-  headerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 15,
-    paddingVertical: 5,
-  },
-  backButton: {
-    paddingRight: 10,
-  },
-  sectionTitle: {
-    flex: 1,
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#333',
-    textAlign: 'center',
-    marginRight: '20%',
-  },
-  propertyCard: {
-    flex: 1,
-    margin: 8,
-    padding: 12,
-    borderRadius: 12,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  iconContainer: {
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: 40,
-    height: 40,
-  },
-  propertyName: {
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-    color: Colors.primary,
-  },
-  advancebutton: {
-    padding: 12,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginHorizontal: 12,
-    marginVertical: 10,
-  },
-  advancetext: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  infoContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginVertical: 10,
-    marginHorizontal: 20,
-  },
-  label: {
-    fontWeight: 'bold',
-    color: '#000',
-    fontSize: 16,
-    marginRight: 5,
-  },
-  value: {
-    fontSize: 16,
-    color: Colors.themePlaceHolder,
-  },
- 
   jobActivityCard: {
     backgroundColor: Colors.white,
     borderRadius: 12,
@@ -680,8 +601,9 @@ const styles = StyleSheet.create({
   },
   jobCardHeader: {
     flexDirection: 'column',
-    marginBottom: 8,
+    // marginBottom: 8,
     flex: 1,
+    paddingHorizontal: 20,
   },
   jobCardName: {
     fontSize: 18,
@@ -720,7 +642,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: 10,
+    // marginHorizontal: 10,
   },
   circleText: {
     fontSize: 24,

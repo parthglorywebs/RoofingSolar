@@ -18,55 +18,63 @@ jobs:
           node-version: '18'  # Specific Node.js version for consistency
 
       - name: Install Dependencies
-        run: npm install nodemailer
+        run: npm install node-mailjet  # Install the Mailjet package
 
-      - name: Send Email with Mailbluster SMTP
+      - name: Send Email with Mailjet API
         env:
-          MAILBLUSTER_HOST: "smtp.mailbluster.com"  # Mailbluster SMTP Host
-          MAILBLUSTER_PORT: 587 # Mailbluster SMTP Port
-          MAILBLUSTER_USERNAME: "parthglory2025@gmail.com" # Replace with your Mailbluster username
-          MAILBLUSTER_PASSWORD: "Glory@123" # Replace with your Mailbluster password
+          MJ_APIKEY_PUBLIC: ${{ secrets.MJ_APIKEY_PUBLIC }}   # Use GitHub Secrets for API Key
+          MJ_APIKEY_PRIVATE: ${{ secrets.MJ_APIKEY_PRIVATE }} # Use GitHub Secrets for Secret Key
           RECIPIENT_EMAIL: "parthglory2025@gmail.com"  # For testing
-          SENDER_EMAIL: "parthglory2025@gmail.com"  # Verified Sender in Mailbluster
+          SENDER_EMAIL: "parthglory2025@gmail.com"  # Verified Sender in Mailjet
+          SENDER_NAME: "GitHub Actions"
+          EMAIL_SUBJECT: "Your APK is Ready!"
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_REPOSITORY: ${{ github.repository }}
 
         run: |
           node <<EOF
-          const nodemailer = require('nodemailer');
+          const mailjet = require('node-mailjet')
+            .connect(process.env.MJ_APIKEY_PUBLIC, process.env.MJ_APIKEY_PRIVATE);
 
           async function main() {
             const GITHUB_RUN_ID = process.env.GITHUB_RUN_ID;
             const REPO = process.env.GITHUB_REPOSITORY;
             const APK_LINK = \`https://github.com/\${REPO}/actions/runs/\${GITHUB_RUN_ID}/artifacts\`;
 
-            let transporter = nodemailer.createTransport({
-              host: process.env.MAILBLUSTER_HOST,
-              port: process.env.MAILBLUSTER_PORT,
-              secure: false,
-              auth: {
-                user: process.env.MAILBLUSTER_USERNAME,
-                pass: process.env.MAILBLUSTER_PASSWORD,
-              },
-              tls: {
-                ciphers: 'SSLv3', // Adjust cipher if needed by Mailbluster
-                rejectUnauthorized: false  // Consider removing this in production if possible, but needed for some SMTP servers
-              }
-            });
+            const request = mailjet
+              .post("send", {'version': 'v3.1'})
+              .request({
+                "Messages": [
+                  {
+                    "From": {
+                      "Email": process.env.SENDER_EMAIL,
+                      "Name": process.env.SENDER_NAME
+                    },
+                    "To": [
+                      {
+                        "Email": process.env.RECIPIENT_EMAIL,
+                        "Name": "Recipient" // You can customize the recipient name here
+                      }
+                    ],
+                    "Subject": process.env.EMAIL_SUBJECT,
+                    "TextPart": \`Download your APK here: \${APK_LINK}\`,
+                    "HTMLPart": \`<p>Your APK is ready! Click below to download:</p><a href="\${APK_LINK}">\${APK_LINK}</a>\`
+                  }
+                ]
+              });
 
-            let info = await transporter.sendMail({
-              from: \`"GitHub Actions" <\${process.env.SENDER_EMAIL}>\`,
-              to: process.env.RECIPIENT_EMAIL,
-              subject: "Your APK is Ready!",
-              text: \`Download your APK here: \${APK_LINK}\`,
-              html: \`<p>Your APK is ready! Click below to download:</p><a href="\${APK_LINK}">\${APK_LINK}</a>\`,
-            });
-
-            console.log("✅ Email sent: %s", info.messageId);
+            request
+              .then((result) => {
+                console.log("✅ Mailjet Email sent successfully:", result.body);
+              })
+              .catch((err) => {
+                console.error("❌ Mailjet Error sending email:", err.statusCode, err.message);
+                process.exit(1); // Exit the workflow with an error
+              });
           }
 
           main().catch((error) => {
-            console.error("❌ Error sending email:", error);
+            console.error("❌ General Error:", error);
             process.exit(1);
           });
           EOF

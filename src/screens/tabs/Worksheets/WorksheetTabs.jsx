@@ -1,4 +1,4 @@
- import React, {useState, useEffect, useCallback, useMemo} from 'react';
+import React, {useState, useEffect, useCallback, useMemo} from 'react';
 import {
   View,
   Text,
@@ -29,9 +29,9 @@ function WorksheetTabs({selectedJob}) {
   const [contractorId, setContractorId] = useState(null);
   const [itemSubtotals, setItemSubtotals] = useState({});  // State to store individual item subtotals
 
-  const labels = ['Draft', 'Edited', 'Submitted', 'Approved'];
-  const dates = ['11/14/24', '11/15/24', '11/16/24', '11/17/24'];
-  const currentPosition = 0;
+  const [labels, setLabels] = useState([]);
+  const [dates, setDates] = useState([]);  // You might need to derive dates based on tracker data
+  const [currentPosition, setCurrentPosition] = useState(0);
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [categories, setCategories] = useState([
@@ -62,7 +62,7 @@ function WorksheetTabs({selectedJob}) {
       const {access_token, contractor_id} = await getLoginDetails();
 
       const response = await axios.post(
-        `${config.baseUrl}contractor/get-financial-data`,
+        `${config.baseUrl}contractor/get-financial-worksheet`,  // Updated Endpoint
         {
           contractor_id: contractor_id,
           project_id: selectedJob.id,
@@ -74,14 +74,27 @@ function WorksheetTabs({selectedJob}) {
         },
       );
 
+      console.log(contractor_id, selectedJob.id);
+      
       const data = response.data;
 
       if (data && data.success && data.data) {
-        setFinancialData(data.data);
+        const { stages, tracker, worksheet, grandtotal, approvedjobvalue, collected } = data.data;
+
+        setLabels(stages);
+
+        const trackerDates = tracker.map(item => {
+          return new Date(item.created_at).toLocaleDateString();
+        });
+        setDates(trackerDates);
+
+        setCurrentPosition(tracker.length -1 )
+
+        setFinancialData(worksheet);
 
         // Initialize itemSubtotals based on the fetched data
         const initialSubtotals = {};
-        data.data.forEach(item => {
+        worksheet.forEach(item => {
             initialSubtotals[item.id] = parseFloat(item.subtotal || 0);
         });
         setItemSubtotals(initialSubtotals);
@@ -327,7 +340,7 @@ function WorksheetTabs({selectedJob}) {
       </View>
 
       {activeTab === 'Financial' && (
-    <ScrollView style={{flex: 1}}> 
+    <ScrollView style={{flex: 1}}>
       <View style={{flexDirection: 'column'}}>
         <View style={styles.financialHeader}>
           <HorizontalStepIndicator
@@ -567,7 +580,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 10,
     // marginRight: 5,
     fontWeight: 'bold',
-    
+
   },
   summaryItemValue: {
     flex: 1,
@@ -576,10 +589,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     padding: 10,
     textAlign: 'right',
-    borderTopRightRadius: 10,  
-    borderBottomRightRadius: 10, 
-    borderWidth: 1, 
-    borderColor: Colors.invoice, 
+    borderTopRightRadius: 10,
+    borderBottomRightRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.invoice,
     borderLeftWidth: 0,
   },
 

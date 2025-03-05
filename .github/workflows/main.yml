@@ -18,63 +18,55 @@ jobs:
           node-version: '18'  # Specific Node.js version for consistency
 
       - name: Install Dependencies
-        run: npm install node-mailjet  # Install the Mailjet package
+        run: npm install nodemailer
 
-      - name: Send Email with Mailjet API
+      - name: Send Email with Brevo SMTP
         env:
-          MJ_APIKEY_PUBLIC: ${{ secrets.MJ_APIKEY_PUBLIC }}   # Use GitHub Secrets for API Key
-          MJ_APIKEY_PRIVATE: ${{ secrets.MJ_APIKEY_PRIVATE }} # Use GitHub Secrets for Secret Key
+          BREVO_HOST: "smtp-relay.brevo.com"
+          BREVO_PORT: 587
+          BREVO_USERNAME: "86daf4001@smtp-brevo.com"
+          BREVO_PASSWORD: "9HUFhqYPs4xgNJAc"
           RECIPIENT_EMAIL: "parthglory2025@gmail.com"  # For testing
-          SENDER_EMAIL: "parthglory2025@gmail.com"  # Verified Sender in Mailjet
-          SENDER_NAME: "GitHub Actions"
-          EMAIL_SUBJECT: "Your APK is Ready!"
+          SENDER_EMAIL: "parthglory2025@gmail.com"  # Verified Sender in Brevo
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_REPOSITORY: ${{ github.repository }}
 
         run: |
           node <<EOF
-          const mailjet = require('node-mailjet')
-            .connect(process.env.MJ_APIKEY_PUBLIC, process.env.MJ_APIKEY_PRIVATE);
+          const nodemailer = require('nodemailer');
 
           async function main() {
             const GITHUB_RUN_ID = process.env.GITHUB_RUN_ID;
             const REPO = process.env.GITHUB_REPOSITORY;
             const APK_LINK = \`https://github.com/\${REPO}/actions/runs/\${GITHUB_RUN_ID}/artifacts\`;
 
-            const request = mailjet
-              .post("send", {'version': 'v3.1'})
-              .request({
-                "Messages": [
-                  {
-                    "From": {
-                      "Email": process.env.SENDER_EMAIL,
-                      "Name": process.env.SENDER_NAME
-                    },
-                    "To": [
-                      {
-                        "Email": process.env.RECIPIENT_EMAIL,
-                        "Name": "Recipient" // You can customize the recipient name here
-                      }
-                    ],
-                    "Subject": process.env.EMAIL_SUBJECT,
-                    "TextPart": \`Download your APK here: \${APK_LINK}\`,
-                    "HTMLPart": \`<p>Your APK is ready! Click below to download:</p><a href="\${APK_LINK}">\${APK_LINK}</a>\`
-                  }
-                ]
-              });
+            let transporter = nodemailer.createTransport({
+              host: process.env.BREVO_HOST,
+              port: process.env.BREVO_PORT,
+              secure: false,
+              auth: {
+                user: process.env.BREVO_USERNAME,
+                pass: process.env.BREVO_PASSWORD,
+              },
+              tls: {
+                ciphers: 'SSLv3',
+                rejectUnauthorized: false
+              }
+            });
 
-            request
-              .then((result) => {
-                console.log("✅ Mailjet Email sent successfully:", result.body);
-              })
-              .catch((err) => {
-                console.error("❌ Mailjet Error sending email:", err.statusCode, err.message);
-                process.exit(1); // Exit the workflow with an error
-              });
+            let info = await transporter.sendMail({
+              from: \`"GitHub Actions" <\${process.env.SENDER_EMAIL}>\`,
+              to: process.env.RECIPIENT_EMAIL,
+              subject: "Your APK is Ready!",
+              text: \`Download your APK here: \${APK_LINK}\`,
+              html: \`<p>Your APK is ready! Click below to download:</p><a href="\${APK_LINK}">\${APK_LINK}</a>\`,
+            });
+
+            console.log("✅ Email sent: %s", info.messageId);
           }
 
           main().catch((error) => {
-            console.error("❌ General Error:", error);
+            console.error("❌ Error sending email:", error);
             process.exit(1);
           });
           EOF

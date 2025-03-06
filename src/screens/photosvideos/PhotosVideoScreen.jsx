@@ -432,11 +432,12 @@ const PhotosVideoScreen = ({selectedJob}) => {
                   ...styles.image,
                   width: width * 0.3,
                   height: width * 0.3,
+                  marginRight: 5,
                 }}
                 resizeMode={FastImage.resizeMode.cover} // Or 'contain', 'stretch', etc.
               />
             ) : item.type && item.type.toLowerCase().includes('video') ? (
-              <View style={{position: 'relative'}}>
+              <View style={{position: 'relative', marginRight: 5,}}>
                 <Video
                   source={{uri: item.uri}}
                   style={{
@@ -1117,7 +1118,7 @@ const styles = StyleSheet.create({
     height: 120,
     position: 'relative',
     marginBottom: 8,
-    marginRight: 5,
+    // marginRight: 5,
   },
   image: {
     borderRadius: 5,
@@ -1154,7 +1155,7 @@ const styles = StyleSheet.create({
   closeIcon: {
     position: 'absolute',
     top: -1,
-    right: -1,
+    right: 2,
     backgroundColor: 'white',
     width: 22,
     height: 22,

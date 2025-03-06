@@ -28,21 +28,26 @@ function WorksheetTabs({selectedJob}) {
   const [invoicesError, setInvoicesError] = useState(null);
   const [contractorId, setContractorId] = useState(null);
   const [itemSubtotals, setItemSubtotals] = useState({});  // State to store individual item subtotals
+  const [summaryValues, setSummaryValues] = useState({  // New state for summary values
+    approvedJobValue: 0,
+    collectedAmount: 0,
+  });
 
   const [labels, setLabels] = useState([]);
   const [dates, setDates] = useState([]);  // You might need to derive dates based on tracker data
   const [currentPosition, setCurrentPosition] = useState(0);
 
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [categories, setCategories] = useState([
-    {id: 'changeOrder', label: 'Change Order', checked: false},
-    {id: 'discount', label: 'Discount', checked: false},
-    {id: 'financialWorksheet', label: 'Financial Worksheet', checked: false},
-    {id: 'insuranceClaim', label: 'Insurance Claim', checked: false},
-    {id: 'supplement', label: 'Supplement', checked: false},
-    {id: 'upgrade', label: 'Upgrade', checked: false},
-    {id: 'workNotDoing', label: 'Work Not Doing', checked: false},
-  ]);
+  const [categories, setCategories] = useState([]);
+  // const [categories, setCategories] = useState([
+  //   {id: 'changeOrder', label: 'Change Order', checked: false},
+  //   {id: 'discount', label: 'Discount', checked: false},
+  //   {id: 'financialWorksheet', label: 'Financial Worksheet', checked: false},
+  //   {id: 'insuranceClaim', label: 'Insurance Claim', checked: false},
+  //   {id: 'supplement', label: 'Supplement', checked: false},
+  //   {id: 'upgrade', label: 'Upgrade', checked: false},
+  //   {id: 'workNotDoing', label: 'Work Not Doing', checked: false},
+  // ]);
 
   useEffect(() => {
      const fetchInitialData = async () => {
@@ -50,9 +55,43 @@ function WorksheetTabs({selectedJob}) {
        setContractorId(contractor_id);
        await fetchFinancialData();
        await fetchInvoicesData();
+       await fetchWorksheetCategories(); 
      };
      fetchInitialData();
   }, [selectedJob, fetchFinancialData, fetchInvoicesData]);
+
+  const fetchWorksheetCategories = async () => {
+    try {
+      const {access_token, contractor_id} = await getLoginDetails();
+      const response = await axios.post(
+        `${config.baseUrl}contractor/get-financial-worksheet-categories`,
+        {
+          contractor_id: contractor_id,
+          project_id: selectedJob.id,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+          },
+        },
+      );
+
+      if (response.data.success) {
+        const fetchedCategories = response.data.data.map(category => ({
+          id: category.id,
+          label: category.name,
+          checked: false,
+        }));
+        setCategories(fetchedCategories);
+      } else {
+        Alert.alert('Error', response.data.message || 'Failed to load categories.');
+      }
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      Alert.alert('Error', 'Failed to load categories.');
+    }
+  };
+
 
   const fetchFinancialData = useCallback(async () => {
     setFinancialLoading(true);
@@ -78,13 +117,13 @@ function WorksheetTabs({selectedJob}) {
       
       const data = response.data;
 
-      if (data && data.success && data.data) {
+      if (data.success) {
         const { stages, tracker, worksheet, grandtotal, approvedjobvalue, collected } = data.data;
 
         setLabels(stages);
 
         const trackerDates = tracker.map(item => {
-          return new Date(item.created_at).toLocaleDateString();
+          return moment(item.created_at).format('DD/MM/YYYY'); // Format the date
         });
         setDates(trackerDates);
 
@@ -153,23 +192,21 @@ function WorksheetTabs({selectedJob}) {
     setActiveTab(tabName);
   };
 
+
   const calculatedSummary = useMemo(() => {
     // Calculate grandTotal from itemSubtotals
     const grandTotal = Object.values(itemSubtotals).reduce((sum, subtotal) => sum + subtotal, 0);
 
     // Initialize other summary values (you might fetch these from an API)
-    let approvedJobValue = 70500.0; // Or fetch from API
-    let collectedAmount = 70500.0; // Or fetch from API
-    const balanceDue = approvedJobValue - collectedAmount;
-
+    const balanceDue = summaryValues.approvedJobValue - summaryValues.collectedAmount;
 
     return {
-      approvedJobValue: parseFloat(approvedJobValue.toFixed(2)),
-      collectedAmount: parseFloat(collectedAmount.toFixed(2)),
+      approvedJobValue: parseFloat(summaryValues.approvedJobValue.toFixed(2)),
+      collectedAmount: parseFloat(summaryValues.collectedAmount.toFixed(2)),
       balanceDue: parseFloat(balanceDue.toFixed(2)),
       grandTotal: parseFloat(grandTotal.toFixed(2)),
     };
-  }, [itemSubtotals]);
+  }, [itemSubtotals, summaryValues]);
 
   // Modal functions
   const openModal = () => {
@@ -348,6 +385,7 @@ function WorksheetTabs({selectedJob}) {
             currentPosition={currentPosition}
             dates={dates}
           />
+          
         </View>
 
         <View style={styles.headerButtonsContainer}>

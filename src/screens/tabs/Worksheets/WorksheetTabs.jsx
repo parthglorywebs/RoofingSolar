@@ -39,15 +39,6 @@ function WorksheetTabs({selectedJob}) {
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [categories, setCategories] = useState([]);
-  // const [categories, setCategories] = useState([
-  //   {id: 'changeOrder', label: 'Change Order', checked: false},
-  //   {id: 'discount', label: 'Discount', checked: false},
-  //   {id: 'financialWorksheet', label: 'Financial Worksheet', checked: false},
-  //   {id: 'insuranceClaim', label: 'Insurance Claim', checked: false},
-  //   {id: 'supplement', label: 'Supplement', checked: false},
-  //   {id: 'upgrade', label: 'Upgrade', checked: false},
-  //   {id: 'workNotDoing', label: 'Work Not Doing', checked: false},
-  // ]);
 
   useEffect(() => {
      const fetchInitialData = async () => {

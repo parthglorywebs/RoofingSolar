@@ -343,10 +343,7 @@ const FinancialList = ({
                 .filter(addedItem => addedItem.parentItemId === item.id)
                 .map((addedItem, addedIndex) => (
                   <View key={addedItem.id}>
-                    <View
-                      style={[styles.editView, styles.modeContainer]}
-
-                      >
+                    <View style={[styles.editView, styles.modeContainer]}>
                       {editingAddedItemId === addedItem.id ? (
                         <View>
                           <View style={styles.labelValueContainer}>

@@ -30,7 +30,7 @@ if (Platform.OS === 'android') {
 
 const InvoicesList = ({data, loading, error, selectedJob}) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [invoices, setInvoices] = useState([]);
+  const [invoiceCategories, setInvoiceCategories] = useState([]); // Now holds the categories
   const [invoicesLoading, setInvoicesLoading] = useState(true); // Add loading state
   const [invoicesError, setInvoicesError] = useState(null); // Add error state
 
@@ -68,54 +68,99 @@ const InvoicesList = ({data, loading, error, selectedJob}) => {
     },
   };
 
-  useEffect(() => {
-    const fetchInvoiceCategories = async () => {
-      setInvoicesLoading(true); // Set loading to true before fetching
-      setInvoicesError(null); // Clear any previous errors
+    const fetchInvoiceWorksheet = useCallback(async () => {
+      setInvoicesLoading(true);
+      setInvoicesError(null);
 
       try {
         const {access_token, contractor_id} = await getLoginDetails();
 
+        const payload = new FormData();
+        payload.append('contractor_id', contractor_id);
+        payload.append('project_id', selectedJob.id);
+
         const response = await axios.post(
-          `${config.baseUrl}contractor/get-invoice-worksheet-categories`,
-          {
-            contractor_id: contractor_id,
-            project_id: selectedJob.id,
-          },
+          `${config.baseUrl}contractor/get-invoice-worksheet`,
+          payload,
           {
             headers: {
               Authorization: `Bearer ${access_token}`,
+              'Content-Type': 'multipart/form-data',
             },
           },
         );
 
         if (response.data.success) {
-          const fetchedInvoices = response.data.data.map(category => ({
-            id: category.slug, // or category.id if appropriate
-            label: category.name,
-            checked: false,
-          }));
-          setInvoices(fetchedInvoices);
+          setSelectedInvoices(response.data.data.invoice);
         } else {
           setInvoicesError(
-            response.data.message || 'Failed to load invoice categories.',
+            response.data.message || 'Failed to load invoice data.',
           );
           Alert.alert(
             'Error',
-            response.data.message || 'Failed to load invoice categories.',
+            response.data.message || 'Failed to load invoice data.',
           );
         }
       } catch (error) {
-        console.error('Error fetching invoice categories:', error);
-        setInvoicesError('Failed to load invoice categories.');
-        Alert.alert('Error', 'Failed to load invoice categories.');
+        console.error('Error fetching invoice worksheet data:', error);
+        setInvoicesError('Failed to load invoice worksheet data.');
+        Alert.alert('Error', 'Failed to load invoice worksheet data.');
       } finally {
-        setInvoicesLoading(false); // Set loading to false after fetching
+        setInvoicesLoading(false);
       }
-    };
+    }, [selectedJob]);
 
-    fetchInvoiceCategories();
-  }, [selectedJob]); // Add selectedJob as a dependency
+     const fetchInvoiceCategories = useCallback(async () => {
+       setInvoicesLoading(true); // Set loading to true before fetching
+       setInvoicesError(null); // Clear any previous errors
+
+       try {
+         const {access_token, contractor_id} = await getLoginDetails();
+
+         const payload = new FormData();
+         payload.append('contractor_id', contractor_id);
+         payload.append('project_id', selectedJob.id);
+
+         const response = await axios.post(
+           `${config.baseUrl}contractor/get-invoice-worksheet-categories`,
+           payload,
+           {
+             headers: {
+               Authorization: `Bearer ${access_token}`,
+               'Content-Type': 'multipart/form-data',
+             },
+           },
+         );
+
+         if (response.data.success) {
+           const fetchedCategories = response.data.data.map(category => ({
+             id: category.id,
+             label: category.name,
+             checked: false,
+           }));
+           setInvoiceCategories(fetchedCategories); //Store in invoiceCategories
+         } else {
+           setInvoicesError(
+             response.data.message || 'Failed to load invoice categories.',
+           );
+           Alert.alert(
+             'Error',
+             response.data.message || 'Failed to load invoice categories.',
+           );
+         }
+       } catch (error) {
+         console.error('Error fetching invoice categories:', error);
+         setInvoicesError('Failed to load invoice categories.');
+         Alert.alert('Error', 'Failed to load invoice categories.');
+       } finally {
+         setInvoicesLoading(false); // Set loading to false after fetching
+       }
+     }, [selectedJob]);
+
+  useEffect(() => {
+    fetchInvoiceWorksheet();
+     fetchInvoiceCategories();
+  }, [fetchInvoiceWorksheet,fetchInvoiceCategories, selectedJob]);
 
   const openModal = useCallback(() => {
     setIsModalVisible(true);
@@ -126,39 +171,88 @@ const InvoicesList = ({data, loading, error, selectedJob}) => {
   }, []);
 
   const handleInvoiceOptionSelect = id => {
-    setInvoices(prevInvoices =>
-      prevInvoices.map(invoice =>
-        invoice.id === id ? {...invoice, checked: !invoice.checked} : invoice,
+    setInvoiceCategories(prevCategories =>
+      prevCategories.map(category =>
+        category.id === id ? {...category, checked: !category.checked} : category,
       ),
     );
   };
 
-  const handleAddInvoices = () => {
-    const newSelectedInvoices = invoices.filter(invoice => invoice.checked);
+  const handleAddInvoices = async () => {
+    const selectedCategoryIds = invoiceCategories
+    .filter(category => category.checked)
+    .map(category => category.id);
 
-    const alreadySelected = newSelectedInvoices.some(newInvoice =>
-      selectedInvoices.some(
-        selectedInvoice => selectedInvoice.id === newInvoice.id,
-      ),
-    );
+    try {
+      const {access_token, contractor_id} = await getLoginDetails();
 
-    if (alreadySelected) {
-      Alert.alert('Warning', 'Selected Invoice already in the list..!!', [
-        {text: 'OK', onPress: () => console.log('OK Pressed')},
-      ]);
-    } else if (newSelectedInvoices.length > 0) {
-      setSelectedInvoices(prevSelected => [
-        ...prevSelected,
-        ...newSelectedInvoices,
-      ]);
-    } else {
-      Alert.alert('Info', 'No invoices selected.', [
-        {text: 'OK', onPress: () => console.log('OK Pressed')},
-      ]);
+      const payload = new FormData();
+      payload.append('contractor_id', contractor_id);
+      payload.append('project_id', selectedJob.id);
+       selectedCategoryIds.forEach(categoryId => {
+         payload.append('categorie_id', categoryId);
+       });
+
+      const response = await axios.post(
+        `${config.baseUrl}contractor/add-invoice-worksheet-categories`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+            'Content-Type': 'multipart/form-data',
+          },
+        },
+      );
+
+      if (response.data.success) {
+        Alert.alert('Success', response.data.message);
+        // Re-fetch the invoice data to update the list:
+         fetchInvoiceWorksheet();
+      } else {
+        Alert.alert('Error', response.data.message || 'Failed to add invoice.');
+      }
+    } catch (error) {
+      console.error('Error adding invoice:', error);
+      Alert.alert('Error', 'Failed to add invoice.');
+    } finally {
+      closeModal();
     }
-
-    closeModal();
   };
+
+  const addInvoiceItemWorksheet = () => {
+
+    //contractor/add-invoice-item-worksheet
+  }
+
+  const updateInvoiceItemWorksheet = () => {
+  //contractor/update-invoice-item-worksheet
+
+  }
+
+
+  const getImportFinancialWorksheetData = () => {
+    //contractor/get-import-financial-worksheet-data
+  }
+  
+  const saveInvoiceWorksheet = () => {
+    //contractor/save-invoice-worksheet
+  }
+
+  const addImportFinancialWorksheetData = () => {
+    //contractor/add-import-financial-worksheet-data
+  }
+
+  const getImportQuotationWorksheet = () => {
+    //contractor/get-import-quotation-worksheet-data
+  }
+
+  const addImportQuotationWorksheet = () => {
+    //contractor/add-import-quotation-worksheet-data
+  }
+
+  const addInovoiceWorksheetSection = () => {
+    //contractor/add-invoice-worksheet-by-section
+  }
 
   const handleDeleteInvoice = useCallback(invoiceId => {
     Alert.alert(
@@ -233,6 +327,40 @@ const InvoicesList = ({data, loading, error, selectedJob}) => {
     }
   };
 
+   const handleEmailInvoice = async invoiceId => {
+    try {
+      const { access_token, contractor_id } = await getLoginDetails();
+
+      const payload = new FormData();
+      payload.append('contractor_id', contractor_id);
+      payload.append('project_id', selectedJob.id);
+      payload.append('invoice_id', invoiceId);
+
+      const response = await axios.post(
+        `${config.baseUrl}contractor/email-invoice-worksheet`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+
+      const data = response.data;
+
+      if (data.success) {
+        Alert.alert('Success', data.message);
+        // Optionally, update the UI to reflect that the email was sent (e.g., disable the email button)
+      } else {
+        Alert.alert('Error', data.message || 'Failed to send email.');
+      }
+    } catch (error) {
+      console.error('Error sending email:', error);
+      Alert.alert('Error', 'Failed to send email.');
+    }
+  };
+
   const toggleCollapse = itemId => {
     LayoutAnimation.configureNext(animationConfig);
     setExpandedItems(prevExpandedItems => ({
@@ -262,9 +390,11 @@ const InvoicesList = ({data, loading, error, selectedJob}) => {
     setEditMode(true);
     setEditedItem(item);
     setEditedValues({
-      invoicename: item.invoicename || '',
+      invoicename: item.invoice_name || '',
       itemname: item.itemname || '', // Default to empty string
-      subtotal: item.subtotal ? item.subtotal.toString() : '', // Default to empty string
+      subtotal: item.invoice_amount ? item.invoice_amount.toString() : '', // Default to empty string
+      invoice_date:item.invoice_date || '',
+      invoice_due_date :item.invoice_due_date || ''
     });
   };
 
@@ -291,6 +421,7 @@ const InvoicesList = ({data, loading, error, selectedJob}) => {
       itemname: '',
       subtotal: '',
       parentItemId: itemId,
+      //date:
     };
 
     setItems(prevItems => [...prevItems, newAddedItem]);
@@ -373,7 +504,7 @@ const InvoicesList = ({data, loading, error, selectedJob}) => {
     let total = 0;
 
     selectedInvoices.forEach(invoice => {
-      const invoiceSubtotal = parseFloat(invoice.subtotal || 0);
+      const invoiceSubtotal = parseFloat(invoice.invoice_amount || 0);
       total += invoiceSubtotal;
 
       items
@@ -387,29 +518,36 @@ const InvoicesList = ({data, loading, error, selectedJob}) => {
   }, [selectedInvoices, items]);
 
   const calculatedSummary = useMemo(() => {
-    // Calculate grandTotal from itemSubtotals
-    const grandTotal = Object.values(itemSubtotals).reduce(
-      (sum, subtotal) => sum + subtotal,
-      0,
-    );
+    let approvalValue = 0;
+    let collectedAmount = 0;
+    let balanceDue = 0;
 
-    // Initialize other summary values (you might fetch these from an API)
-    let approvedJobValue = 70500.0; // Or fetch from API
-    let collectedAmount = 70500.0; // Or fetch from API
+    if (selectedInvoices && selectedInvoices.length > 0) {
+      // Assuming the first invoice object contains the approval_value, collected, and balance_due
+      const firstInvoice = selectedInvoices[0];
+      approvalValue = parseFloat(firstInvoice.approval_value || 0);
+      collectedAmount = parseFloat(firstInvoice.collected || 0);
+      balanceDue = parseFloat(firstInvoice.balance_due || 0);
+    }
+
+    // Calculate total invoice amount (grand total) from all selected invoices
+    const invoiceGrandTotal = selectedInvoices.reduce((sum, invoice) => {
+      const invoiceAmount = parseFloat(invoice.invoice_amount || 0);
+      return sum + invoiceAmount;
+    }, 0);
+
+    // You might fetch these from an API)
     let accountreceived = 118386.0;
-    let invoicegrandtotal = 70500.0;
-    // const balanceDue = approvedJobValue - collectedAmount;
-    const balanceDue = 0.0;
 
     return {
       accountreceived: parseFloat(accountreceived.toFixed(2)),
-      invoicegrandtotal: parseFloat(invoicegrandtotal.toFixed(2)),
-      approvedJobValue: parseFloat(approvedJobValue.toFixed(2)),
+      invoicegrandtotal: parseFloat(invoiceGrandTotal.toFixed(2)),
+      approvedJobValue: parseFloat(approvalValue.toFixed(2)),
       collectedAmount: parseFloat(collectedAmount.toFixed(2)),
       balanceDue: parseFloat(balanceDue.toFixed(2)),
-      grandTotal: parseFloat(grandTotal.toFixed(2)),
+      grandTotal: parseFloat(invoiceGrandTotal.toFixed(2)),
     };
-  }, [itemSubtotals]);
+  }, [selectedInvoices]);
 
   // End new code for add Items and handle it
 
@@ -432,7 +570,7 @@ const InvoicesList = ({data, loading, error, selectedJob}) => {
       ) : (
         <View>
           {selectedInvoices.map((item, index) => {
-            const invoiceSubtotal = parseFloat(item.subtotal || 0);
+            const invoiceSubtotal = parseFloat(item.invoice_amount || 0);
             const addedItemsSubtotal = items
               .filter(addedItem => addedItem.parentItemId === item.id)
               .reduce(
@@ -451,7 +589,7 @@ const InvoicesList = ({data, loading, error, selectedJob}) => {
                   <View style={styles.listTopHeader}>
                     <View style={styles.listItemLeft}>
                       <Text style={styles.listItemHeaderText}>
-                        Invoice #{invoiceNumber}
+                        Invoice #{item.invoice_number}
                       </Text>
                       <Icon
                         name={
@@ -482,7 +620,7 @@ const InvoicesList = ({data, loading, error, selectedJob}) => {
                       <View style={styles.invoiceBg}>
                         <TextInput
                           style={styles.inputInvoice}
-                          value={editedValues.invoicename || ''}
+                          value={editedValues.invoicename || item.invoice_name || ''}
                           onChangeText={text =>
                             handleInputChange('invoicename', text)
                           }
@@ -513,7 +651,7 @@ const InvoicesList = ({data, loading, error, selectedJob}) => {
                           </Text>
                           <TextInput
                             style={[styles.inputInvoiceDate, {flex: 1}]}
-                            value={invoiceDate}
+                            value={editedValues.invoice_date || item.invoice_date || ''}
                             editable={false} // Make it read-only
                             placeholder="Select Invoice Date"
                           />
@@ -551,7 +689,7 @@ const InvoicesList = ({data, loading, error, selectedJob}) => {
                           </Text>
                           <TextInput
                             style={[styles.inputInvoiceDate, {flex: 1}]}
-                            value={dueDate}
+                            value={editedValues.invoice_due_date || item.invoice_due_date || ''}
                             editable={false}
                             placeholder="Select Due Date"
                           />
@@ -573,7 +711,7 @@ const InvoicesList = ({data, loading, error, selectedJob}) => {
                     <View style={styles.listItemHeader}>
                       <View style={styles.listItemLeft}>
                         <Text style={styles.listItemHeaderText}>
-                          {item.label}
+                          {item.invoice_name}
                         </Text>
                         <Icon
                           name={
@@ -661,7 +799,7 @@ const InvoicesList = ({data, loading, error, selectedJob}) => {
 
                               <View style={styles.labelValueContainer}>
                                 <Text style={styles.financialItemValue}>
-                                  {item.subtotal || '$0'}
+                                  {item.invoice_amount || '$0'}
                                 </Text>
                               </View>
                             </TouchableOpacity>
@@ -793,13 +931,14 @@ const InvoicesList = ({data, loading, error, selectedJob}) => {
                             Preview
                           </Text>
                         </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[
-                            bottomSubcontainerStyles.bottomButton,
-                            bottomSubcontainerStyles.mailButton,
-                          ]}>
-                          <Icon name="email" size={24} color={Colors.primary} />
-                        </TouchableOpacity>
+                         <TouchableOpacity
+                         style={[
+                           bottomSubcontainerStyles.bottomButton,
+                           bottomSubcontainerStyles.mailButton,
+                         ]}
+                         onPress={() => handleEmailInvoice(item.id)}>
+                         <Icon name="email" size={24} color={Colors.primary} />
+                       </TouchableOpacity>
                         <TouchableOpacity
                           style={[
                             bottomSubcontainerStyles.bottomButton,
@@ -823,7 +962,7 @@ const InvoicesList = ({data, loading, error, selectedJob}) => {
           <View style={styles.grandTotalContainer}>
             <Text style={styles.grandTotalText}>Grand Total:</Text>
             <Text style={styles.grandTotalAmount}>
-              ${totalSubtotal.toFixed(2).toString()}
+              ${calculatedSummary.grandTotal.toFixed(2).toString()}
             </Text>
           </View>
 
@@ -939,7 +1078,7 @@ const InvoicesList = ({data, loading, error, selectedJob}) => {
           <View style={modalStyles.modalContent}>
             <Text style={modalStyles.modalTitle}>Add Invoice</Text>
             <ScrollView>
-              {invoices.map(invoice => (
+              {invoiceCategories.map(invoice => (
                 <TouchableOpacity
                   key={invoice.id}
                   style={modalStyles.categoryItem}

@@ -262,46 +262,57 @@ const FinancialList = ({
   const handleSaveAddedItem = itemId => {
     setEditingAddedItemId(null);
   };
-
-  const handleDeleteAddedItem = itemId => {
+const handleDeleteAddedItem = (categoryId, itemId) => {
     Alert.alert(
       'Delete Item',
       'Are you sure you want to delete this item?',
       [
-        {text: 'Cancel', style: 'cancel'},
+        { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            const deletedItem = items.find(i => i.id === itemId);
-            setItems(prevItems => prevItems.filter(i => i.id !== itemId));
+          onPress: async () => {
+            try {
+              const { access_token, contractor_id } = await getLoginDetails();
 
-            //update subtotal in parent after delete
-            if (deletedItem) {
-              const parentItemId = deletedItem.parentItemId;
-              // Recalculate subtotal for the parent item
-              const parentItem = financialData.find(
-                item => item.id === parentItemId,
+              const payload = new FormData();
+              payload.append('contractor_id', contractorId);
+              payload.append('project_id', selectedJob.id);
+              payload.append('categorie_id', categoryId);
+              payload.append('item_id', itemId);
+
+              const response = await axios.post(
+                `${config.baseUrl}contractor/delete-financial-worksheet-categories-item`,
+                payload,
+                {
+                  headers: {
+                    Authorization: `Bearer ${access_token}`,
+                    'Content-Type': 'multipart/form-data',
+                  },
+                }
               );
-              const newTotal =
-                parseFloat(parentItem.subtotal || 0) +
-                items
-                  .filter(
-                    addedItem =>
-                      addedItem.parentItemId === parentItemId &&
-                      addedItem.id !== itemId,
-                  )
-                  .reduce(
-                    (sum, addedItem) =>
-                      sum + parseFloat(addedItem.subtotal || 0),
-                    0,
-                  );
-              onSubtotalChange(parentItemId, newTotal);
+
+              const data = response.data;
+
+              if (data.success) {
+                Alert.alert('Success', data.message);
+                // Optimistically update the UI: Remove the deleted item from the local state
+                setItems(prevItems => prevItems.filter(item => item.id !== itemId));
+
+                // After deleting, update subtotal in parent component
+                // You might need to recalculate the subtotal for the category and call onSubtotalChange
+
+              } else {
+                Alert.alert('Error', data.message || 'Failed to delete item.');
+              }
+            } catch (error) {
+              console.error('Error deleting item:', error);
+              Alert.alert('Error', 'Failed to delete item.');
             }
           },
         },
       ],
-      {cancelable: false},
+      { cancelable: false }
     );
   };
 
@@ -330,6 +341,84 @@ const FinancialList = ({
       }
     }
   };
+
+   // Function to handle storing financial worksheet data
+ /* const handleStoreFinancialWorksheetData = async (worksheetId, title, amount) => {
+    try {
+      const { access_token, contractor_id } = await getLoginDetails();
+
+      const payload = new FormData();
+      payload.append('contractor_id', contractorId);
+      payload.append('project_id', selectedJob.id);
+      payload.append('worksheet_id', worksheetId);
+      payload.append('title', title);
+      payload.append('amount', amount);
+
+      const response = await axios.post(
+        `${config.baseUrl}contractor/store-financial-worksheet-data`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+
+      const data = response.data;
+
+      if (data.success) {
+        Alert.alert('Success', data.message);
+        // Handle successful data storage, e.g., update UI or state
+
+      } else {
+        Alert.alert('Error', data.message || 'Failed to store data.');
+      }
+    } catch (error) {
+      console.error('Error storing financial data:', error);
+      Alert.alert('Error', 'Failed to store financial data.');
+    }
+  }; */
+
+   // Function to handle updating financial worksheet data
+   /* const handleUpdateFinancialWorksheetData = async (itemId, title, amount) => {
+    try {
+      const { access_token, contractor_id } = await getLoginDetails();
+
+      const payload = new FormData();
+      payload.append('contractor_id', contractorId);
+      payload.append('project_id', selectedJob.id);
+      payload.append('item_id', itemId);
+      payload.append('title', title);
+      payload.append('amount', amount);
+
+      const response = await axios.post(
+        `${config.baseUrl}contractor/update-financial-worksheet-data`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+
+      const data = response.data;
+
+      if (data.success) {
+        Alert.alert('Success', data.message);
+        // Handle successful data update, e.g., update UI or state
+
+      } else {
+        Alert.alert('Error', data.message || 'Failed to update data.');
+      }
+    } catch (error) {
+      console.error('Error updating financial data:', error);
+      Alert.alert('Error', 'Failed to update financial data.');
+    }
+  };
+ */
+
 
   if (loading) {
     return <ActivityIndicator size="large" color={Colors.primary} />;
@@ -562,7 +651,7 @@ const FinancialList = ({
                             <TouchableOpacity
                               style={styles.deleteButton}
                               onPress={() =>
-                                handleDeleteAddedItem(addedItem.id)
+                                handleDeleteAddedItem(item.id,addedItem.id)
                               }>
                               <Icon
                                 name="dots-vertical"

@@ -201,31 +201,41 @@ function WorksheetTabs({selectedJob}) {
   //   closeModal();
   // };
 
-  const handleAddCategories = async () => {
+const handleAddCategories = async () => {
     const selectedCategories = categories
       .filter(cat => cat.checked)
-      .map(cat => cat.id);
+      .map(cat => cat.id); // Get IDs, not the entire object
+  
+    if (selectedCategories.length === 0) {
+      Alert.alert('Info', 'Please select at least one category to add.');
+      return;
+    }
   
     try {
       const {access_token, contractor_id} = await getLoginDetails();
   
+      // Prepare the form data
+      const formData = new FormData();
+      formData.append('contractor_id', contractor_id);
+      formData.append('project_id', selectedJob.id);
+  
+      // Append each selected category ID individually
+      selectedCategories.forEach(categoryId => {
+        formData.append('categorie_id', categoryId);
+      });
+  
       const response = await axios.post(
         `${config.baseUrl}contractor/add-financial-worksheet-categories`,
-        {
-          contractor_id: contractor_id,
-          project_id: selectedJob.id,
-          categorie_id: selectedCategories,
-        },
+        formData,
         {
           headers: {
             Authorization: `Bearer ${access_token}`,
-            'Content-Type': 'application/json',
+            'Content-Type': 'multipart/form-data', // Important!
           },
         }
       );
   
-      console.log(contractor_id, selectedJob.id, selectedCategories);
-      console.log(response.data); // Log the entire response
+      console.log(response.data); // Log the entire response for debugging
   
       if (response.data.success) {
         if (response.data.data && response.data.data.error) {

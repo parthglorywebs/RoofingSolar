@@ -176,7 +176,7 @@ const FinancialList = ({
     setItemnameError('');
   };
 
-  const handleDelete = itemId => {
+ const handleDelete = itemId => {
     Alert.alert(
       'Delete Item',
       'Are you sure you want to delete this item?',
@@ -185,14 +185,45 @@ const FinancialList = ({
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            onDelete(itemId);
-            // After deleting, update subtotal in parent component
-            onSubtotalChange(itemId, 0);
+          onPress: async () => {
+            try {
+              const {access_token, contractor_id} = await getLoginDetails();
+  
+              const payload = new FormData();
+              payload.append('contractor_id', contractorId);
+              payload.append('project_id', selectedJob.id);
+              payload.append('categorie_id', itemId);
+  
+              const response = await axios.post(
+                `${config.baseUrl}contractor/delete-financial-worksheet-categories`,
+                payload,
+                {
+                  headers: {
+                    Authorization: `Bearer ${access_token}`,
+                    'Content-Type': 'multipart/form-data',
+                  },
+                }
+              );
+  
+              const data = response.data;
+  
+              if (data.success) {
+                Alert.alert('Success', data.message);
+                setFinancialData(prevData =>
+                  prevData.filter(item => item.id !== itemId)
+                );
+                onSubtotalChange(itemId, 0);
+              } else {
+                Alert.alert('Error', data.message || 'Failed to delete item.');
+              }
+            } catch (error) {
+              console.error('Error deleting item:', error);
+              Alert.alert('Error', 'Failed to delete item.');
+            }
           },
         },
       ],
-      {cancelable: false},
+      { cancelable: false }
     );
   };
 

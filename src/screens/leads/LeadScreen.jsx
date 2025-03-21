@@ -294,27 +294,25 @@ const LeadScreen = ({route}) => {
     [setError],
   );
 
-  const handlePropertyDetail = useCallback(() => {
-    if (!selectedJob) {
+  const handlePropertyDetail = useCallback(
+    (project) => {
+    if (!project) {
       console.warn('selectedJob is undefined, cannot navigate to PropertyInfo');
       return;
     }
-    // console.log({...selectedJob});
 
     navigation.navigate('PropertyInfo', {
       itemData: {
-        ...selectedJob,
-        currentStage: itemData?.currentStage || selectedJob?.stage_name,
-        progress: selectedJob.progress?.props?.progress,
-        totalAmount: selectedJob?.balancedue?.totalAmount,
-        balanceDue: selectedJob?.balancedue?.balanceDue,
-        percentage: selectedJob?.balancedue?.percentage,
+        ...project, // Use the passed project directly
+        currentStage: itemData?.currentStage || project?.stage_name,
+        progress: project.progress?.props?.progress,
+        totalAmount: project?.balancedue?.totalAmount,
+        balanceDue: project?.balancedue?.balanceDue,
+        percentage: project?.balancedue?.percentage,
       },
-      selectedJob: selectedJob,
+      selectedJob: project,
     });
-
-    closeModal();
-  }, [navigation, selectedJob, closeModal, itemData]);
+  }, [navigation, itemData]);
 
   const renderItem = useCallback(
     ({item}) => {
@@ -344,7 +342,7 @@ const LeadScreen = ({route}) => {
   );
 
   const getCircleColors = useCallback(
-    currentStage => {
+    (currentStage) => {
       switch (currentStage) {
         case 'lead':
           return {textColor: '#6691E7', backgroundColor: '#E8EFFB'};
@@ -357,17 +355,15 @@ const LeadScreen = ({route}) => {
         case 'invoice':
           return {textColor: '#865CE2', backgroundColor: '#EDE7FB'};
         default:
-          return {
-            textColor: isDarkMode ? '#FFF' : '#0A84E3',
-            backgroundColor: isDarkMode ? '#444' : '#FFF',
-          };
+          case 'lead':
+          return {textColor: '#6691E7', backgroundColor: '#E8EFFB'};
       }
     },
     [isDarkMode],
   );
 
   const getCircleInfo = useCallback(
-    currentStage => {
+    (currentStage) => {
       const {textColor, backgroundColor} = getCircleColors(
         currentStage?.toLowerCase(),
         isDarkMode,
@@ -435,19 +431,19 @@ const LeadScreen = ({route}) => {
   const renderProjectList = useMemo(
     () =>
       filteredProjects.map((project, index) => {
-        const circleText =
-          itemData?.currentStage?.charAt(0)?.toUpperCase() ||
-          project?.stage_name?.charAt(0)?.toUpperCase() ||
-          'N';
-        const circleInfo = getCircleInfo(
-          itemData?.currentStage || project?.stage_name,
-        );
+        const stageForCircleInfo = selectedFilterStage || itemData?.currentStage || project?.stage_name;
+        const circleText = stageForCircleInfo?.charAt(0)?.toUpperCase() || 'L';
+        const circleInfo = getCircleInfo(stageForCircleInfo);
         const passedTextColor = itemData?.textColor;
+
         return (
           <TouchableOpacity
             key={index}
             style={styles.jobActivityCard}
-            onPress={() => openModal(project)}>
+            onPress={() => 
+            // openModal(project)
+            handlePropertyDetail(project)
+            }>
             <View style={styles.rowContainer}>
               <View
                 style={[
@@ -537,7 +533,7 @@ const LeadScreen = ({route}) => {
           </TouchableOpacity>
         );
       }),
-    [filteredProjects, getCircleInfo, itemData, openModal],
+    [filteredProjects, getCircleInfo, itemData, openModal, selectedFilterStage],
   );
 
   const handleCallPress = useCallback(
@@ -1040,7 +1036,6 @@ const LeadScreen = ({route}) => {
     handleStageSelect,
     openFilterModal,
     closeFilterModal,
-    handleResetFilter,
     selectedFilterStage,
     renderProjectList,
     handleCallPress,
@@ -1048,7 +1043,8 @@ const LeadScreen = ({route}) => {
     handleMap,
     isFetchingMore,
     currentPage,
-    renderEmptyState, // Important: Add renderEmptyState to dependencies
+    renderEmptyState,
+    getCircleColors
   ]);
 
   return (
@@ -1070,6 +1066,7 @@ const LeadScreen = ({route}) => {
   );
 };
 
+
 const styles = StyleSheet.create({
   filterHeader: {
     flexDirection: 'row',
@@ -1087,11 +1084,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 10,
     padding: 20,
+    marginHorizontal: 20
   },
   filterChipContainer: {
     paddingHorizontal: 20,
     paddingTop: 5,
-    paddingBottom: 5,
     width: '50%',
   },
   filterChip: {

@@ -358,7 +358,7 @@ const PropertyInfo = () => {
           tabBarScrollEnabled: true,
           tabBarStyle: {
             backgroundColor: Colors.tabBackground,
-            paddingTop: 5,
+            // paddingTop: 5,
             paddingBottom: 5,
           },
           tabBarItemStyle: {

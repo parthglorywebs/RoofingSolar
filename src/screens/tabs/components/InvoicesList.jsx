@@ -18,6 +18,9 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Collapsible from 'react-native-collapsible';
 import {Calendar} from 'react-native-calendars'; // Import Calendar
 import {Menu, Provider, Divider} from 'react-native-paper';
+import axios from 'axios';
+import {getLoginDetails} from '../../../utils/AsyncStorage';
+import config from '../../../config/config';
 
 if (Platform.OS === 'android') {
   if (UIManager.setLayoutAnimationEnabledExperimental) {
@@ -25,17 +28,11 @@ if (Platform.OS === 'android') {
   }
 }
 
-const InvoicesList = ({data, loading, error}) => {
+const InvoicesList = ({data, loading, error, selectedJob}) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [invoices, setInvoices] = useState([
-    {id: 'changeOrder', label: 'Change Order', checked: false},
-    {id: 'discount', label: 'Discount', checked: false},
-    {id: 'financialWorksheet', label: 'Financial Worksheet', checked: false},
-    {id: 'insuranceClaim', label: 'Insurance Claim', checked: false},
-    {id: 'supplement', label: 'Supplement', checked: false},
-    {id: 'upgrade', label: 'Upgrade', checked: false},
-    {id: 'workNotDoing', label: 'Work Not Doing', checked: false},
-  ]);
+  const [invoices, setInvoices] = useState([]);
+  const [invoicesLoading, setInvoicesLoading] = useState(true); // Add loading state
+  const [invoicesError, setInvoicesError] = useState(null); // Add error state
 
   const [selectedInvoices, setSelectedInvoices] = useState([]);
   const [expandedItems, setExpandedItems] = useState({});
@@ -51,8 +48,9 @@ const InvoicesList = ({data, loading, error}) => {
   const [isInvoiceDatePickerVisible, setIsInvoiceDatePickerVisible] =
     useState(false);
   const [isDueDatePickerVisible, setIsDueDatePickerVisible] = useState(false);
-  const [itemSubtotals, setItemSubtotals] = useState({}); 
-  const [selectedInvoiceIdForAction, setSelectedInvoiceIdForAction] = useState(null);
+  const [itemSubtotals, setItemSubtotals] = useState({});
+  const [selectedInvoiceIdForAction, setSelectedInvoiceIdForAction] =
+    useState(null);
   const [isActionModalVisible, setIsActionModalVisible] = useState(false);
   // LayoutAnimation configuration
   const animationConfig = {
@@ -69,6 +67,55 @@ const InvoicesList = ({data, loading, error}) => {
       property: LayoutAnimation.Properties.opacity,
     },
   };
+
+  useEffect(() => {
+    const fetchInvoiceCategories = async () => {
+      setInvoicesLoading(true); // Set loading to true before fetching
+      setInvoicesError(null); // Clear any previous errors
+
+      try {
+        const {access_token, contractor_id} = await getLoginDetails();
+
+        const response = await axios.post(
+          `${config.baseUrl}contractor/get-invoice-worksheet-categories`,
+          {
+            contractor_id: contractor_id,
+            project_id: selectedJob.id,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${access_token}`,
+            },
+          },
+        );
+
+        if (response.data.success) {
+          const fetchedInvoices = response.data.data.map(category => ({
+            id: category.slug, // or category.id if appropriate
+            label: category.name,
+            checked: false,
+          }));
+          setInvoices(fetchedInvoices);
+        } else {
+          setInvoicesError(
+            response.data.message || 'Failed to load invoice categories.',
+          );
+          Alert.alert(
+            'Error',
+            response.data.message || 'Failed to load invoice categories.',
+          );
+        }
+      } catch (error) {
+        console.error('Error fetching invoice categories:', error);
+        setInvoicesError('Failed to load invoice categories.');
+        Alert.alert('Error', 'Failed to load invoice categories.');
+      } finally {
+        setInvoicesLoading(false); // Set loading to false after fetching
+      }
+    };
+
+    fetchInvoiceCategories();
+  }, [selectedJob]); // Add selectedJob as a dependency
 
   const openModal = useCallback(() => {
     setIsModalVisible(true);
@@ -133,7 +180,7 @@ const InvoicesList = ({data, loading, error}) => {
     );
   }, []);
 
-  const handleOpenActionModal = (invoiceId) => {
+  const handleOpenActionModal = invoiceId => {
     setSelectedInvoiceIdForAction(invoiceId);
     setIsActionModalVisible(true);
   };
@@ -143,7 +190,7 @@ const InvoicesList = ({data, loading, error}) => {
     setSelectedInvoiceIdForAction(null);
   };
 
-  const handleActionSelect = (action) => {
+  const handleActionSelect = action => {
     handleCloseActionModal();
 
     switch (action) {
@@ -163,7 +210,9 @@ const InvoicesList = ({data, loading, error}) => {
               style: 'destructive',
               onPress: () => {
                 setSelectedInvoices(prevInvoices =>
-                  prevInvoices.filter(invoice => invoice.id !== selectedInvoiceIdForAction),
+                  prevInvoices.filter(
+                    invoice => invoice.id !== selectedInvoiceIdForAction,
+                  ),
                 );
               },
             },
@@ -337,38 +386,39 @@ const InvoicesList = ({data, loading, error}) => {
     setTotalSubtotal(total);
   }, [selectedInvoices, items]);
 
-
   const calculatedSummary = useMemo(() => {
-      // Calculate grandTotal from itemSubtotals
-      const grandTotal = Object.values(itemSubtotals).reduce((sum, subtotal) => sum + subtotal, 0);
-  
-      // Initialize other summary values (you might fetch these from an API)
-      let approvedJobValue = 70500.00; // Or fetch from API
-      let collectedAmount = 70500.00; // Or fetch from API
-      let accountreceived = 118386.00; 
-      let invoicegrandtotal = 70500.0;
-      // const balanceDue = approvedJobValue - collectedAmount;
-      const balanceDue = 0.00;
-  
-  
-      return {
-        accountreceived: parseFloat(accountreceived.toFixed(2)),
-        invoicegrandtotal: parseFloat(invoicegrandtotal.toFixed(2)),
-        approvedJobValue: parseFloat(approvedJobValue.toFixed(2)),
-        collectedAmount: parseFloat(collectedAmount.toFixed(2)),
-        balanceDue: parseFloat(balanceDue.toFixed(2)),
-        grandTotal: parseFloat(grandTotal.toFixed(2)),
-      };
-    }, [itemSubtotals]);
+    // Calculate grandTotal from itemSubtotals
+    const grandTotal = Object.values(itemSubtotals).reduce(
+      (sum, subtotal) => sum + subtotal,
+      0,
+    );
+
+    // Initialize other summary values (you might fetch these from an API)
+    let approvedJobValue = 70500.0; // Or fetch from API
+    let collectedAmount = 70500.0; // Or fetch from API
+    let accountreceived = 118386.0;
+    let invoicegrandtotal = 70500.0;
+    // const balanceDue = approvedJobValue - collectedAmount;
+    const balanceDue = 0.0;
+
+    return {
+      accountreceived: parseFloat(accountreceived.toFixed(2)),
+      invoicegrandtotal: parseFloat(invoicegrandtotal.toFixed(2)),
+      approvedJobValue: parseFloat(approvedJobValue.toFixed(2)),
+      collectedAmount: parseFloat(collectedAmount.toFixed(2)),
+      balanceDue: parseFloat(balanceDue.toFixed(2)),
+      grandTotal: parseFloat(grandTotal.toFixed(2)),
+    };
+  }, [itemSubtotals]);
 
   // End new code for add Items and handle it
 
-  if (loading) {
+  if (invoicesLoading) {
     return <ActivityIndicator size="large" color="#007bff" />;
   }
 
-  if (error) {
-    return <Text style={styles.errorText}>{error}</Text>;
+  if (invoicesError) {
+    return <Text style={styles.errorText}>{invoicesError}</Text>;
   }
 
   return (
@@ -379,7 +429,6 @@ const InvoicesList = ({data, loading, error}) => {
 
       {selectedInvoices.length === 0 ? (
         <Text style={styles.noDataText}>No Invoices Available</Text>
-       
       ) : (
         <View>
           {selectedInvoices.map((item, index) => {
@@ -779,46 +828,45 @@ const InvoicesList = ({data, loading, error}) => {
           </View>
 
           <View style={styles.financialSummary}>
-        <View style={styles.summaryItemContainer}>
-          <Text style={styles.summaryItemLabel}>Accounts Receivable</Text>
-          <Text style={styles.summaryItemValue}>
-           ${calculatedSummary.accountreceived.toFixed(2).toString()}
-          </Text>
-        </View>
+            <View style={styles.summaryItemContainer}>
+              <Text style={styles.summaryItemLabel}>Accounts Receivable</Text>
+              <Text style={styles.summaryItemValue}>
+                ${calculatedSummary.accountreceived.toFixed(2).toString()}
+              </Text>
+            </View>
 
-        <View style={styles.summaryItemContainer}>
-          <Text style={styles.summaryItemLabel}>Invoice Grand Total</Text>
-          <Text style={styles.summaryItemValue}>
-           ${calculatedSummary.invoicegrandtotal.toFixed(2).toString()}
-          </Text>
-        </View>
-        
-        <View style={styles.summaryItemContainer}>
-          <Text style={styles.summaryItemLabel}>Approval Value</Text>
-          <Text style={styles.summaryItemValue}>
-           ${calculatedSummary.approvedJobValue.toFixed(2).toString()}
-          </Text>
-        </View>
-         
-        <View style={styles.summaryItemContainer}>
-          <Text style={styles.summaryItemLabel}>Collected</Text>
-          <Text style={styles.summaryItemValue}>
-           ${calculatedSummary.collectedAmount.toFixed(2).toString()}
-          </Text>
-        </View>
+            <View style={styles.summaryItemContainer}>
+              <Text style={styles.summaryItemLabel}>Invoice Grand Total</Text>
+              <Text style={styles.summaryItemValue}>
+                ${calculatedSummary.invoicegrandtotal.toFixed(2).toString()}
+              </Text>
+            </View>
 
-        <View style={styles.summaryItemContainer}>
-          <Text style={styles.summaryItemLabel}>Balance Due</Text>
-          <Text
-            style={[
-              styles.summaryItemValue,
-              {color: Colors.success, fontWeight: 'bold'},
-            ]}>
-            ${calculatedSummary.balanceDue.toFixed(2).toString()}
-          </Text>
-        </View>
-      </View>
-         
+            <View style={styles.summaryItemContainer}>
+              <Text style={styles.summaryItemLabel}>Approval Value</Text>
+              <Text style={styles.summaryItemValue}>
+                ${calculatedSummary.approvedJobValue.toFixed(2).toString()}
+              </Text>
+            </View>
+
+            <View style={styles.summaryItemContainer}>
+              <Text style={styles.summaryItemLabel}>Collected</Text>
+              <Text style={styles.summaryItemValue}>
+                ${calculatedSummary.collectedAmount.toFixed(2).toString()}
+              </Text>
+            </View>
+
+            <View style={styles.summaryItemContainer}>
+              <Text style={styles.summaryItemLabel}>Balance Due</Text>
+              <Text
+                style={[
+                  styles.summaryItemValue,
+                  {color: Colors.success, fontWeight: 'bold'},
+                ]}>
+                ${calculatedSummary.balanceDue.toFixed(2).toString()}
+              </Text>
+            </View>
+          </View>
 
           {/* Invoice Date Picker Modal */}
           <Modal
@@ -995,7 +1043,7 @@ const styles = StyleSheet.create({
   listItemHeaderText: {
     fontWeight: 'bold',
     fontSize: 16,
-    color: '#865CE2', 
+    color: '#865CE2',
   },
   deleteButton: {
     padding: 1,
@@ -1178,8 +1226,8 @@ const styles = StyleSheet.create({
     top: '50%',
     transform: [{translateY: -12}], // Adjust to vertically center the icon
   },
-  financialSummary : {
-    marginTop: 10
+  financialSummary: {
+    marginTop: 10,
   },
   summaryItemContainer: {
     flexDirection: 'row',
@@ -1198,7 +1246,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 10,
     // marginRight: 5,
     fontWeight: 'bold',
-    
   },
   summaryItemValue: {
     flex: 1,
@@ -1207,10 +1254,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     padding: 10,
     textAlign: 'right',
-    borderTopRightRadius: 10,  
-    borderBottomRightRadius: 10, 
-    borderWidth: 1, 
-    borderColor: Colors.invoice, 
+    borderTopRightRadius: 10,
+    borderBottomRightRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.invoice,
     borderLeftWidth: 0,
   },
 });

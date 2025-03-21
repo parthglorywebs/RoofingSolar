@@ -11,9 +11,9 @@
 		13B07FBC1A68108700A75B9A /* AppDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = 13B07FB01A68108700A75B9A /* AppDelegate.mm */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		13B07FC11A68108700A75B9A /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 13B07FB71A68108700A75B9A /* main.m */; };
+		5C44F73BF74092345AE31726 /* libPods-RoofingSolar-RoofingSolarTests.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5CD75E3F127EC8A22956A653 /* libPods-RoofingSolar-RoofingSolarTests.a */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
-		82FBC05C9758E3E454725DFD /* libPods-RoofingSolar.a in Frameworks */ = {isa = PBXBuildFile; fileRef = D975E87A73E74F81E2E56AD5 /* libPods-RoofingSolar.a */; };
-		C76C20DCE471848BC3A4BE5B /* libPods-RoofingSolar-RoofingSolarTests.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 59936B1C56CA53C2EE8486CD /* libPods-RoofingSolar-RoofingSolarTests.a */; };
+		A58D0F350136F7143B1A7BD7 /* libPods-RoofingSolar.a in Frameworks */ = {isa = PBXBuildFile; fileRef = AAF96889AD29A19C778353EA /* libPods-RoofingSolar.a */; };
 		E49684D968402D027B0891B2 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
@@ -38,13 +38,13 @@
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = RoofingSolar/Info.plist; sourceTree = "<group>"; };
 		13B07FB71A68108700A75B9A /* main.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = main.m; path = RoofingSolar/main.m; sourceTree = "<group>"; };
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = RoofingSolar/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		59936B1C56CA53C2EE8486CD /* libPods-RoofingSolar-RoofingSolarTests.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-RoofingSolar-RoofingSolarTests.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		75D33115E7BEDC7CA6763DDD /* Pods-RoofingSolar.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RoofingSolar.debug.xcconfig"; path = "Target Support Files/Pods-RoofingSolar/Pods-RoofingSolar.debug.xcconfig"; sourceTree = "<group>"; };
+		4B8A185DF6B9BBD2B8EA83E2 /* Pods-RoofingSolar-RoofingSolarTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RoofingSolar-RoofingSolarTests.debug.xcconfig"; path = "Target Support Files/Pods-RoofingSolar-RoofingSolarTests/Pods-RoofingSolar-RoofingSolarTests.debug.xcconfig"; sourceTree = "<group>"; };
+		5CD75E3F127EC8A22956A653 /* libPods-RoofingSolar-RoofingSolarTests.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-RoofingSolar-RoofingSolarTests.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		7151EF13B84BC6BC2A6E09A6 /* Pods-RoofingSolar.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RoofingSolar.debug.xcconfig"; path = "Target Support Files/Pods-RoofingSolar/Pods-RoofingSolar.debug.xcconfig"; sourceTree = "<group>"; };
+		769E3178ED00E15BC67A2EEB /* Pods-RoofingSolar.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RoofingSolar.release.xcconfig"; path = "Target Support Files/Pods-RoofingSolar/Pods-RoofingSolar.release.xcconfig"; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = RoofingSolar/LaunchScreen.storyboard; sourceTree = "<group>"; };
-		9B093FBC04A8DD8EBBB95C89 /* Pods-RoofingSolar-RoofingSolarTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RoofingSolar-RoofingSolarTests.release.xcconfig"; path = "Target Support Files/Pods-RoofingSolar-RoofingSolarTests/Pods-RoofingSolar-RoofingSolarTests.release.xcconfig"; sourceTree = "<group>"; };
-		BB92A5381CE47ED193F31B38 /* Pods-RoofingSolar.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RoofingSolar.release.xcconfig"; path = "Target Support Files/Pods-RoofingSolar/Pods-RoofingSolar.release.xcconfig"; sourceTree = "<group>"; };
-		CBD7E2AC12DA7B2C684375FA /* Pods-RoofingSolar-RoofingSolarTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RoofingSolar-RoofingSolarTests.debug.xcconfig"; path = "Target Support Files/Pods-RoofingSolar-RoofingSolarTests/Pods-RoofingSolar-RoofingSolarTests.debug.xcconfig"; sourceTree = "<group>"; };
-		D975E87A73E74F81E2E56AD5 /* libPods-RoofingSolar.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-RoofingSolar.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		AAF96889AD29A19C778353EA /* libPods-RoofingSolar.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-RoofingSolar.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		ADD4F64DB1CA29F184F54D0F /* Pods-RoofingSolar-RoofingSolarTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RoofingSolar-RoofingSolarTests.release.xcconfig"; path = "Target Support Files/Pods-RoofingSolar-RoofingSolarTests/Pods-RoofingSolar-RoofingSolarTests.release.xcconfig"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
@@ -53,7 +53,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C76C20DCE471848BC3A4BE5B /* libPods-RoofingSolar-RoofingSolarTests.a in Frameworks */,
+				5C44F73BF74092345AE31726 /* libPods-RoofingSolar-RoofingSolarTests.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -61,7 +61,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				82FBC05C9758E3E454725DFD /* libPods-RoofingSolar.a in Frameworks */,
+				A58D0F350136F7143B1A7BD7 /* libPods-RoofingSolar.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -103,8 +103,8 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				D975E87A73E74F81E2E56AD5 /* libPods-RoofingSolar.a */,
-				59936B1C56CA53C2EE8486CD /* libPods-RoofingSolar-RoofingSolarTests.a */,
+				AAF96889AD29A19C778353EA /* libPods-RoofingSolar.a */,
+				5CD75E3F127EC8A22956A653 /* libPods-RoofingSolar-RoofingSolarTests.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -143,10 +143,10 @@
 		BBD78D7AC51CEA395F1C20DB /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				75D33115E7BEDC7CA6763DDD /* Pods-RoofingSolar.debug.xcconfig */,
-				BB92A5381CE47ED193F31B38 /* Pods-RoofingSolar.release.xcconfig */,
-				CBD7E2AC12DA7B2C684375FA /* Pods-RoofingSolar-RoofingSolarTests.debug.xcconfig */,
-				9B093FBC04A8DD8EBBB95C89 /* Pods-RoofingSolar-RoofingSolarTests.release.xcconfig */,
+				7151EF13B84BC6BC2A6E09A6 /* Pods-RoofingSolar.debug.xcconfig */,
+				769E3178ED00E15BC67A2EEB /* Pods-RoofingSolar.release.xcconfig */,
+				4B8A185DF6B9BBD2B8EA83E2 /* Pods-RoofingSolar-RoofingSolarTests.debug.xcconfig */,
+				ADD4F64DB1CA29F184F54D0F /* Pods-RoofingSolar-RoofingSolarTests.release.xcconfig */,
 			);
 			path = Pods;
 			sourceTree = "<group>";
@@ -158,12 +158,12 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 00E357021AD99517003FC87E /* Build configuration list for PBXNativeTarget "RoofingSolarTests" */;
 			buildPhases = (
-				5402FFBD741C360C7D4B5E2F /* [CP] Check Pods Manifest.lock */,
+				461069EE451042B1F08E5140 /* [CP] Check Pods Manifest.lock */,
 				00E356EA1AD99517003FC87E /* Sources */,
 				00E356EB1AD99517003FC87E /* Frameworks */,
 				00E356EC1AD99517003FC87E /* Resources */,
-				ABC1E9C19B301FF6A12E7519 /* [CP] Embed Pods Frameworks */,
-				30092E9B74B5013B8F112F83 /* [CP] Copy Pods Resources */,
+				3791BB73AAEF79EFC9F4AF7D /* [CP] Embed Pods Frameworks */,
+				1CF0CACB7F41E01E7EB3A82D /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
 			);
@@ -179,13 +179,13 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "RoofingSolar" */;
 			buildPhases = (
-				5B2BA6ECA57F76B4C41123A7 /* [CP] Check Pods Manifest.lock */,
+				2EE4CF22E96F13EF1C087BB2 /* [CP] Check Pods Manifest.lock */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
-				FBE9E007483B37B8A0FE8EFD /* [CP] Embed Pods Frameworks */,
-				FBCD7C522BE0D27BF9AC7EFD /* [CP] Copy Pods Resources */,
+				34654D7B89947FA0A4373D43 /* [CP] Embed Pods Frameworks */,
+				558C615A35B93FDACA108D78 /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
 			);
@@ -269,7 +269,7 @@
 			shellPath = /bin/sh;
 			shellScript = "set -e\n\nWITH_ENVIRONMENT=\"$REACT_NATIVE_PATH/scripts/xcode/with-environment.sh\"\nREACT_NATIVE_XCODE=\"$REACT_NATIVE_PATH/scripts/react-native-xcode.sh\"\n\n/bin/sh -c \"$WITH_ENVIRONMENT $REACT_NATIVE_XCODE\"\n";
 		};
-		30092E9B74B5013B8F112F83 /* [CP] Copy Pods Resources */ = {
+		1CF0CACB7F41E01E7EB3A82D /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -286,29 +286,7 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-RoofingSolar-RoofingSolarTests/Pods-RoofingSolar-RoofingSolarTests-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		5402FFBD741C360C7D4B5E2F /* [CP] Check Pods Manifest.lock */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
-				"${PODS_ROOT}/Manifest.lock",
-			);
-			name = "[CP] Check Pods Manifest.lock";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-RoofingSolar-RoofingSolarTests-checkManifestLockResult.txt",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
-			showEnvVarsInLog = 0;
-		};
-		5B2BA6ECA57F76B4C41123A7 /* [CP] Check Pods Manifest.lock */ = {
+		2EE4CF22E96F13EF1C087BB2 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -330,7 +308,24 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
-		ABC1E9C19B301FF6A12E7519 /* [CP] Embed Pods Frameworks */ = {
+		34654D7B89947FA0A4373D43 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-RoofingSolar/Pods-RoofingSolar-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-RoofingSolar/Pods-RoofingSolar-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-RoofingSolar/Pods-RoofingSolar-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		3791BB73AAEF79EFC9F4AF7D /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -347,7 +342,29 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-RoofingSolar-RoofingSolarTests/Pods-RoofingSolar-RoofingSolarTests-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		FBCD7C522BE0D27BF9AC7EFD /* [CP] Copy Pods Resources */ = {
+		461069EE451042B1F08E5140 /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-RoofingSolar-RoofingSolarTests-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		558C615A35B93FDACA108D78 /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -362,23 +379,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-RoofingSolar/Pods-RoofingSolar-resources.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
-		FBE9E007483B37B8A0FE8EFD /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-RoofingSolar/Pods-RoofingSolar-frameworks-${CONFIGURATION}-input-files.xcfilelist",
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-RoofingSolar/Pods-RoofingSolar-frameworks-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-RoofingSolar/Pods-RoofingSolar-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
@@ -414,7 +414,7 @@
 /* Begin XCBuildConfiguration section */
 		00E356F61AD99517003FC87E /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = CBD7E2AC12DA7B2C684375FA /* Pods-RoofingSolar-RoofingSolarTests.debug.xcconfig */;
+			baseConfigurationReference = 4B8A185DF6B9BBD2B8EA83E2 /* Pods-RoofingSolar-RoofingSolarTests.debug.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				GCC_PREPROCESSOR_DEFINITIONS = (
@@ -441,7 +441,7 @@
 		};
 		00E356F71AD99517003FC87E /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 9B093FBC04A8DD8EBBB95C89 /* Pods-RoofingSolar-RoofingSolarTests.release.xcconfig */;
+			baseConfigurationReference = ADD4F64DB1CA29F184F54D0F /* Pods-RoofingSolar-RoofingSolarTests.release.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				COPY_PHASE_STRIP = NO;
@@ -465,7 +465,7 @@
 		};
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 75D33115E7BEDC7CA6763DDD /* Pods-RoofingSolar.debug.xcconfig */;
+			baseConfigurationReference = 7151EF13B84BC6BC2A6E09A6 /* Pods-RoofingSolar.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -493,7 +493,7 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = BB92A5381CE47ED193F31B38 /* Pods-RoofingSolar.release.xcconfig */;
+			baseConfigurationReference = 769E3178ED00E15BC67A2EEB /* Pods-RoofingSolar.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;

@@ -18,6 +18,7 @@ import {useLoginMutation} from '../../redux/api/apiClient';
 import WebViewComponent from '../../components/Webview';
 import Colors from '../../assets/styling/colors';
 import CustomCheckbox from '../../components/CustomCheckbox';
+import {useColorScheme} from 'react-native'; // Import useColorScheme
 
 const {width} = Dimensions.get('window');
 const SignIn = ({navigation}) => {
@@ -36,6 +37,9 @@ const SignIn = ({navigation}) => {
     password: '',
   });
   const [isFocused, setIsFocused] = useState({email: false, password: false});
+
+  const colorScheme = useColorScheme(); // Get the current color scheme
+  const isDarkMode = colorScheme === 'dark'; // Determine if it's dark mode
 
   useEffect(() => {
     const backHandler = BackHandler.addEventListener(
@@ -202,7 +206,7 @@ const SignIn = ({navigation}) => {
         keyboardType="email-address"
         value={email}
         onChangeText={handleEmailChange}
-        mode="outlined"
+        mode="outlined" 
         error={!!error.email}
         theme={{
           roundness: isFocused.email ? 15 : 11,
@@ -210,7 +214,7 @@ const SignIn = ({navigation}) => {
             primary: isFocused.email
               ? Colors.noneFocusTextinput
               : Colors.primary,
-            text: Colors.primary,
+            text: (isDarkMode || email) ? Colors.black : Colors.primary,  // Apply always light color
             placeholder: Colors.themePlaceHolder,
             error: Colors.red,
             fontSize: 18,
@@ -244,7 +248,7 @@ const SignIn = ({navigation}) => {
               primary: isFocused.password
                 ? Colors.noneFocusTextinput
                 : Colors.primary,
-              text: Colors.primary,
+              text: (isDarkMode || password) ? Colors.primary : Colors.primary,  // Always apply light color
               placeholder: Colors.themeDotted,
               error: Colors.red,
               fontSize: 18,

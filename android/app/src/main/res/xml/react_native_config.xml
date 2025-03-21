@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="user" />
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+    <!--
+    <domain-config cleartextTrafficPermitted="true">  // Remove or comment out this section
+        <domain includeSubdomains="false">13.56.14.87</domain>
+    </domain-config>
+    -->
+</network-security-config>

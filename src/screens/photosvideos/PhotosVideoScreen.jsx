@@ -1146,6 +1146,7 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
     alignItems: 'center',
     opacity: 0.5,
+    height: 30,
   },
   timeText: {
     color: 'black',

@@ -1,5 +1,4 @@
-//MessageScreen.jsx:
-import React, {useState, useEffect, useCallback} from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   SafeAreaView,
   StyleSheet,
@@ -10,6 +9,10 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  Keyboard,
+  TouchableWithoutFeedback,
+  Platform,
+  KeyboardAvoidingView
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import Colors from '../../assets/styling/colors';
@@ -23,81 +26,42 @@ const MessagesScreen = ({selectedJob}) => {
   const [error, setError] = useState({newComment: ''});
   const [comments, setComments] = useState([]);
   const [apiLoading, setApiLoading] = useState(true);
-  const [postingComment, setPostingComment] = useState(false); // New state for posting comment loader
+  const [postingComment, setPostingComment] = useState(false);
   const [userName, setUserName] = useState('');
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);  // Track keyboard visibility
+
+  const textInputRef = useRef(null); // Create a ref
 
   useEffect(() => {
     const fetchInitialData = async () => {
       const {name} = await getLoginDetails();
       setUserName(name);
-      fetchCommentList();
     };
     fetchInitialData();
-  }, [fetchCommentList, selectedJob]);
+    // textInputRef.current.focus();
+  }, []);
+
 
   useEffect(() => {
-    if (userName) {
-      // console.log('User Name:', userName);
-    }
-  }, [userName]);
-
-  const fetchCommentList = useCallback(async () => {
-    if (!selectedJob || !selectedJob.id) {
-      console.warn('selectedJob is invalid. Not fetching comments.');
-      setApiLoading(false);
-      return;
-    }
-
-    setApiLoading(true);
-    try {
-      const {access_token, contractor_id} = await getLoginDetails();
-      // console.log(contractor_id, selectedJob.id);
-
-
-      const response = await axios.post(
-        `${config.baseUrl}contractor/get-comment-board`,
-        {
-          contractor_id: contractor_id,
-          project_id: selectedJob.id,
-        },
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-            Authorization: `Bearer ${access_token}`,
-          },
-        },
-      );
-
-      const data = response.data;
-      // console.log('API Response Data:', data);
-
-      if (data && data.data) {
-        const formattedComments = data.data.map(item => ({
-          id: String(item.id),
-          text: item.text,
-          date: moment(item.created_at).format('YYYY-MM-DD'),
-          time: moment(item.created_at).format('hh:mm A'),
-          author: item.name,
-          created_at_human: item.created_at_human,
-          contractor_name: item.contractor_name,
-          created_at: item.created_at,
-        }));
-        setComments(formattedComments);
-      } else {
-        setComments([]); // Set empty array if data is not present or invalid
-        console.error('Invalid data format received from API:', data);
-        Alert.alert(
-          'Error',
-          'Failed to load comment files. Invalid data format.',
-        );
+    const keyboardDidShowListener = Keyboard.addListener(
+      'keyboardDidShow',
+      () => {
+        setKeyboardVisible(true); // Set keyboard visible state
       }
-    } catch (error) {
-      console.error('Error fetching comments:', error);
-      Alert.alert('Error', 'Failed to load comments.');
-    } finally {
-      setApiLoading(false);
-    }
-  }, [selectedJob]);
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      'keyboardDidHide',
+      () => {
+        setKeyboardVisible(false); // Set keyboard invisible state
+      }
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
+
 
   const handlePostComment = async () => {
     const {newComment} = form;
@@ -112,7 +76,7 @@ const MessagesScreen = ({selectedJob}) => {
     setError(errors);
     if (!isValid) return;
 
-    setPostingComment(true); // Show loader
+    setPostingComment(true);
 
     try {
       const {access_token, contractor_id} = await getLoginDetails();
@@ -135,13 +99,12 @@ const MessagesScreen = ({selectedJob}) => {
       const data = response.data;
 
       if (data && data.success && data.data.original.success) {
-        // Access the nested data structure
         const newCommentData = {
           id: String(data.data.original.data.id),
           text: data.data.original.data.text,
           date: moment(data.data.original.data.created_at).format('YYYY-MM-DD'),
           time: moment(data.data.original.data.created_at).format('hh:mm A'),
-          author: data.data.original.data.name, // Or get the author name from the API response if available
+          author: data.data.original.data.name,
           created_at_human: data.data.original.data.created_at_human,
           contractor_name: data.data.original.data.contractor_name,
           created_at: data.data.original.data.created_at,
@@ -156,7 +119,7 @@ const MessagesScreen = ({selectedJob}) => {
       console.error('Error posting comment:', error);
       Alert.alert('Error', 'Failed to post comment.');
     } finally {
-      setPostingComment(false); // Hide loader
+      setPostingComment(false);
     }
   };
 
@@ -259,62 +222,72 @@ const MessagesScreen = ({selectedJob}) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.searchInput}
-          onChangeText={text => setForm({newComment: text})}
-          value={form.newComment}
-          placeholder="Messages"
-          onSubmitEditing={handlePostComment} // Call handlePostComment on submit
-        />
-        <TouchableOpacity onPress={handlePostComment} disabled={postingComment}>
-          <View style={{flexDirection: 'row'}}>
-            <MaterialCommunityIcons
-              name={'image-multiple'}
-              size={16}
-              color={Colors.themePlaceHolder}
-              style={styles.icon}
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 40 : 0}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <SafeAreaView style={styles.container}>
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.searchInput}
+              onChangeText={text => setForm({newComment: text})}
+              value={form.newComment}
+              placeholder="Messages"
+              onSubmitEditing={handlePostComment}
+              ref={textInputRef}
+              blurOnSubmit={false}
             />
+            <TouchableOpacity onPress={handlePostComment} disabled={postingComment}>
+              <View style={{flexDirection: 'row'}}>
+                <MaterialCommunityIcons
+                  name={'image-multiple'}
+                  size={16}
+                  color={Colors.themePlaceHolder}
+                  style={styles.icon}
+                />
 
-            <MaterialCommunityIcons
-              name={'account'}
-              size={16}
-              color={Colors.themePlaceHolder}
-              style={styles.icon}
-            />
+                <MaterialCommunityIcons
+                  name={'account'}
+                  size={16}
+                  color={Colors.themePlaceHolder}
+                  style={styles.icon}
+                />
 
-            <MaterialCommunityIcons
-              name={'camera'}
-              size={16}
-              color={Colors.themePlaceHolder}
-              style={styles.icon}
-            />
+                <MaterialCommunityIcons
+                  name={'camera'}
+                  size={16}
+                  color={Colors.themePlaceHolder}
+                  style={styles.icon}
+                />
+              </View>
+            </TouchableOpacity>
           </View>
-        </TouchableOpacity>
-      </View>
-      {error.newComment ? (
-        <Text style={styles.errorText}>{error.newComment}</Text>
-      ) : null}
+          {error.newComment ? (
+            <Text style={styles.errorText}>{error.newComment}</Text>
+          ) : null}
 
-      {postingComment ? (
-        <ActivityIndicator size="large" color="#007bff" />
-      ) : apiLoading ? (
-        <ActivityIndicator
-          size="large"
-          color="#007bff"
-          style={{marginTop: '50%'}}
-        />
-      ) : (
-        <FlatList
-          data={comments}
-          keyExtractor={item => item.id}
-          renderItem={renderComment}
-          contentContainerStyle={styles.commentsListContainer}
-          ListEmptyComponent={renderEmptyComponent}
-        />
-      )}
-    </SafeAreaView>
+          {postingComment ? (
+            <ActivityIndicator size="large" color="#007bff" />
+          ) : apiLoading ? (
+            <ActivityIndicator
+              size="large"
+              color="#007bff"
+              style={{marginTop: '50%'}}
+            />
+          ) : (
+            <FlatList
+              data={comments}
+              keyExtractor={item => item.id}
+              renderItem={renderComment}
+              contentContainerStyle={styles.commentsListContainer}
+              ListEmptyComponent={renderEmptyComponent}
+            />
+          )}
+        </SafeAreaView>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -322,8 +295,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
-    padding: 15,
-    marginTop: 20,
+    // padding: 15,
+    marginTop: 5,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -334,7 +307,7 @@ const styles = StyleSheet.create({
     borderColor: 'gray',
     paddingHorizontal: 15,
     marginHorizontal: 10,
-    marginBottom: 15,
+    // marginBottom: 15,
   },
   searchInput: {
     flex: 1,
@@ -351,13 +324,12 @@ const styles = StyleSheet.create({
   },
   commentsListContainer: {
     paddingBottom: 20,
-    flexGrow: 1, // Ensure the FlatList can grow to fill available space
+    flexGrow: 1,
   },
   cardView: {
     backgroundColor: '#fff',
     padding: 15,
     borderRadius: 10,
-    // marginBottom: 10,
     shadowColor: '#000',
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.2,
@@ -398,7 +370,6 @@ const styles = StyleSheet.create({
   messageContent: {
     fontSize: 14,
     color: '#333',
-    // marginVertical: 10,
   },
   timestampContainer: {
     alignSelf: 'flex-end',

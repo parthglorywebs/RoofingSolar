@@ -17,39 +17,39 @@ import config from '../../../config/config';
 import HorizontalStepIndicator from '../../../components/HorizontalStepIndicator';
 import FinancialList from '../components/FinancialList';
 import InvoicesList from '../components/InvoicesList';
+import moment from 'moment';
 
 function WorksheetTabs({selectedJob}) {
   const [activeTab, setActiveTab] = useState('Financial');
-  const [financialData, setFinancialData] = useState([]);
   const [invoicesData, setInvoicesData] = useState([]);
-  const [financialLoading, setFinancialLoading] = useState(true);
   const [invoicesLoading, setInvoicesLoading] = useState(true);
-  const [financialError, setFinancialError] = useState(null);
   const [invoicesError, setInvoicesError] = useState(null);
   const [contractorId, setContractorId] = useState(null);
-  const [itemSubtotals, setItemSubtotals] = useState({});  // State to store individual item subtotals
-  const [summaryValues, setSummaryValues] = useState({  // New state for summary values
+  const [itemSubtotals, setItemSubtotals] = useState({}); // State to store individual item subtotals
+  const [summaryValues, setSummaryValues] = useState({
+    // New state for summary values
     approvedJobValue: 0,
     collectedAmount: 0,
   });
 
   const [labels, setLabels] = useState([]);
-  const [dates, setDates] = useState([]);  // You might need to derive dates based on tracker data
+  const [dates, setDates] = useState([]); // You might need to derive dates based on tracker data
   const [currentPosition, setCurrentPosition] = useState(0);
 
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [categories, setCategories] = useState([]);
+  const [financialData, setFinancialData] = useState([]); // State to hold financial data
 
   useEffect(() => {
-     const fetchInitialData = async () => {
-       const { contractor_id } = await getLoginDetails();
-       setContractorId(contractor_id);
-       await fetchFinancialData();
-       await fetchInvoicesData();
-       await fetchWorksheetCategories(); 
-     };
-     fetchInitialData();
-  }, [selectedJob, fetchFinancialData, fetchInvoicesData]);
+    const fetchInitialData = async () => {
+      const {contractor_id} = await getLoginDetails();
+      setContractorId(contractor_id);
+      //const financial = await fetchFinancialData(); // Remove this call
+      await fetchInvoicesData();
+      await fetchWorksheetCategories();
+    };
+    fetchInitialData();
+  }, [selectedJob]); // Remove contractorId from the dependency array since it only gets set once
 
   const fetchWorksheetCategories = async () => {
     try {
@@ -75,72 +75,16 @@ function WorksheetTabs({selectedJob}) {
         }));
         setCategories(fetchedCategories);
       } else {
-        Alert.alert('Error', response.data.message || 'Failed to load categories.');
+        Alert.alert(
+          'Error',
+          response.data.message || 'Failed to load categories.',
+        );
       }
     } catch (error) {
       console.error('Error fetching categories:', error);
       Alert.alert('Error', 'Failed to load categories.');
     }
   };
-
-
-  const fetchFinancialData = useCallback(async () => {
-    setFinancialLoading(true);
-    setFinancialError(null);
-
-    try {
-      const {access_token, contractor_id} = await getLoginDetails();
-
-      const response = await axios.post(
-        `${config.baseUrl}contractor/get-financial-worksheet`,  // Updated Endpoint
-        {
-          contractor_id: contractor_id,
-          project_id: selectedJob.id,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${access_token}`,
-          },
-        },
-      );
-
-      console.log(contractor_id, selectedJob.id);
-      
-      const data = response.data;
-
-      if (data.success) {
-        const { stages, tracker, worksheet, grandtotal, approvedjobvalue, collected } = data.data;
-
-        setLabels(stages);
-
-        const trackerDates = tracker.map(item => {
-          return moment(item.created_at).format('DD/MM/YYYY'); // Format the date
-        });
-        setDates(trackerDates);
-
-        setCurrentPosition(tracker.length -1 )
-
-        setFinancialData(worksheet);
-
-        // Initialize itemSubtotals based on the fetched data
-        const initialSubtotals = {};
-        worksheet.forEach(item => {
-            initialSubtotals[item.id] = parseFloat(item.subtotal || 0);
-        });
-        setItemSubtotals(initialSubtotals);
-
-      } else {
-        //  setFinancialError(data.message || 'Failed to load financial data.');
-        //  Alert.alert('Error', data.message || 'Failed to load financial data.');
-      }
-    } catch (error) {
-      // console.error('Error fetching financial data:', error);
-      //    setFinancialError('Failed to load financial data.');
-      //    Alert.alert('Error', 'Failed to load financial data.');
-    } finally {
-      setFinancialLoading(false);
-    }
-  }, [selectedJob]);
 
   const fetchInvoicesData = useCallback(async () => {
     setInvoicesLoading(true);
@@ -183,13 +127,16 @@ function WorksheetTabs({selectedJob}) {
     setActiveTab(tabName);
   };
 
-
   const calculatedSummary = useMemo(() => {
     // Calculate grandTotal from itemSubtotals
-    const grandTotal = Object.values(itemSubtotals).reduce((sum, subtotal) => sum + subtotal, 0);
+    const grandTotal = Object.values(itemSubtotals).reduce(
+      (sum, subtotal) => sum + subtotal,
+      0,
+    );
 
     // Initialize other summary values (you might fetch these from an API)
-    const balanceDue = summaryValues.approvedJobValue - summaryValues.collectedAmount;
+    const balanceDue =
+      summaryValues.approvedJobValue - summaryValues.collectedAmount;
 
     return {
       approvedJobValue: parseFloat(summaryValues.approvedJobValue.toFixed(2)),
@@ -208,116 +155,130 @@ function WorksheetTabs({selectedJob}) {
     setIsModalVisible(false);
   };
 
-  const handleCategoryChange = (id) => {
-    const updatedCategories = categories.map((category) =>
-      category.id === id ? {...category, checked: !category.checked} : category
+  const handleCategoryChange = id => {
+    const updatedCategories = categories.map(category =>
+      category.id === id ? {...category, checked: !category.checked} : category,
     );
     setCategories(updatedCategories);
   };
 
-  const handleAddCategories = () => {
+  // const handleAddCategories = () => {
+  //   const selectedCategories = categories
+  //     .filter(cat => cat.checked)
+  //     .map(cat => cat.label); // Extract labels, not the whole object.
+
+  //   // Check for duplicate categories BEFORE adding
+  //   const duplicateCategories = selectedCategories.filter(category =>
+  //     financialData.some(item => item.category.name === category),
+  //   );
+
+  //   if (duplicateCategories.length > 0) {
+  //     Alert.alert(
+  //       'Error',
+  //       `The Category "${duplicateCategories.join(', ')}" Already Exists!`,
+  //     );
+  //     return; // Don't add if duplicates exist.
+  //   }
+
+  //   // Create new financial data items
+  //   const newFinancialItems = selectedCategories.map(category => ({
+  //     id: Date.now() + Math.random(), // Generate a unique ID
+  //     name: category,
+  //     itemname: '',
+  //     subtotal: 0,
+  //   }));
+
+  //   // Update financialData state
+  //   setFinancialData(prevData => [...prevData, ...newFinancialItems]);
+
+  //   // Also initialize subtotals for the new items:
+  //   const newSubtotals = {};
+  //   newFinancialItems.forEach(item => {
+  //     newSubtotals[item.id] = 0;
+  //   });
+  //   setItemSubtotals(prevSubtotals => ({...prevSubtotals, ...newSubtotals}));
+
+  //   closeModal();
+  // };
+
+  const handleAddCategories = async () => {
     const selectedCategories = categories
       .filter(cat => cat.checked)
-      .map(cat => cat.label); // Extract labels, not the whole object.
-
-    // Check for duplicate categories BEFORE adding
-    const duplicateCategories = selectedCategories.filter(category =>
-      financialData.some(item => item.name === category),
-    );
-
-    if (duplicateCategories.length > 0) {
-      Alert.alert(
-        'Error',
-        `The Category "${duplicateCategories.join(', ')}" Already Exists!`
-      );
-      return; // Don't add if duplicates exist.
-    }
-
-     // Create new financial data items
-     const newFinancialItems = selectedCategories.map(category => ({
-      id: Date.now() + Math.random(), // Generate a unique ID
-      name: category,
-      itemname: '',
-      subtotal: 0,
-    }));
-
-    // Update financialData state
-    setFinancialData(prevData => [...prevData, ...newFinancialItems]);
-
-       // Also initialize subtotals for the new items:
-       const newSubtotals = {};
-       newFinancialItems.forEach(item => {
-           newSubtotals[item.id] = 0;
-       });
-       setItemSubtotals(prevSubtotals => ({...prevSubtotals, ...newSubtotals}));
-
-    closeModal();
-  };
-
-  const handleSave = (updatedItem) => {
-    setFinancialData(prevData =>
-      prevData.map(item =>
-        item.id === updatedItem.id ? updatedItem : item
-      )
-    );
-  };
-
-  const handleDelete = (itemId) => { // <-- Add 'handleDelete' function
-      setFinancialData(prevData => prevData.filter(item => item.id !== itemId));
-      setItemSubtotals(prevSubtotals => {
-          const {[itemId]: deleted, ...rest} = prevSubtotals;  // Remove the item from subtotals
-          return rest;
-      });
-  };
-
-  // Placeholder function - REPLACE WITH YOUR ACTUAL SAVE LOGIC
-  const saveSelectedCategories = (selectedCategories) => {
-    //  Make API call or update local state to save
-    // console.log('Saving categories:', selectedCategories);
-    //  Example:
-    //  updateFinancialDataWithCategories(selectedCategories);
-  };
-
-  const handleSaveFinancialData = async updatedData => {
+      .map(cat => cat.id);
+  
     try {
       const {access_token, contractor_id} = await getLoginDetails();
-
+  
       const response = await axios.post(
-        `${config.baseUrl}contractor/update-financial-data`,
+        `${config.baseUrl}contractor/add-financial-worksheet-categories`,
         {
           contractor_id: contractor_id,
           project_id: selectedJob.id,
-          financial_data: updatedData,
+          categorie_id: selectedCategories,
         },
         {
           headers: {
             Authorization: `Bearer ${access_token}`,
+            'Content-Type': 'application/json',
           },
-        },
+        }
       );
-
-      const data = response.data;
-
-      if (data && data.success) {
-        // Update the local state with the updated data from the server (optional).
-        setFinancialData(updatedData); //This line has changed.  Setting the financialData State.
-        Alert.alert('Success', 'Financial data updated successfully.');
+  
+      console.log(contractor_id, selectedJob.id, selectedCategories);
+      console.log(response.data); // Log the entire response
+  
+      if (response.data.success) {
+        if (response.data.data && response.data.data.error) {
+          // Categories were already added
+          Alert.alert(
+            'Info',
+            response.data.data.error || 'Some categories were already added.'
+          );
+        } else {
+          // Categories were successfully added (none were duplicates)
+          Alert.alert('Success', response.data.message);
+        }
+  
+        await fetchFinancialData(); // Re-fetch to update the list
       } else {
-        Alert.alert('Error', data.message || 'Failed to update financial data.');
+        // The API call itself failed (e.g., invalid input)
+        Alert.alert(
+          'Error',
+          response.data.message || 'Failed to add categories.'
+        );
       }
     } catch (error) {
-      console.error('Error updating financial data:', error);
-      Alert.alert('Error', 'Failed to update financial data.');
+      console.error('Error adding categories:', error);
+      Alert.alert('Error', 'Failed to add categories.');
+    } finally {
+      closeModal();
     }
   };
 
+  const handleSave = updatedItem => {
+    setFinancialData(prevData =>
+      prevData.map(
+        item => (item.id === updatedItem.id ? {...item, ...updatedItem} : item), // Ensure you're spreading the updatedItem correctly
+      ),
+    );
+  };
+
+  const handleDelete = itemId => {
+    // <-- Add 'handleDelete'\ function
+    setFinancialData(prevData => prevData.filter(item => item.id !== itemId));
+    setItemSubtotals(prevSubtotals => {
+      const {[itemId]: deleted, ...rest} = prevSubtotals; // Remove the item from subtotals
+      return rest;
+    });
+  };
+
   // Function to update individual item subtotals
-    const handleSubtotalChange = (itemId, newSubtotal) => {
-        setItemSubtotals(prevSubtotals => ({
-            ...prevSubtotals,
-            [itemId]: newSubtotal,
-        }));
-    };
+  const handleSubtotalChange = useCallback((itemId, newSubtotal) => {
+    setItemSubtotals(prevSubtotals => ({
+      ...prevSubtotals,
+      [itemId]: newSubtotal,
+    }));
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -368,86 +329,87 @@ function WorksheetTabs({selectedJob}) {
       </View>
 
       {activeTab === 'Financial' && (
-    <ScrollView style={{flex: 1}}>
-      <View style={{flexDirection: 'column'}}>
-        <View style={styles.financialHeader}>
-          <HorizontalStepIndicator
-            labels={labels}
-            currentPosition={currentPosition}
-            dates={dates}
+        <ScrollView style={{flex: 1}}>
+          <View style={{flexDirection: 'column'}}>
+            <View style={styles.financialHeader}>
+              <HorizontalStepIndicator
+                labels={labels}
+                currentPosition={currentPosition}
+                dates={dates}
+              />
+            </View>
+
+            <View style={styles.headerButtonsContainer}>
+              <TouchableOpacity style={styles.saveToApprovedButton}>
+                <Text style={styles.saveToApprovedText}>Save to Approved</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.addbutton} onPress={openModal}>
+                <Text style={styles.addtext}>+</Text>
+              </TouchableOpacity>
+            </View>
+
+            <FinancialList
+              selectedJob={selectedJob}
+              contractorId={contractorId}
+              openModal={openModal}
+              financialData={financialData} // Pass the financial data as a prop
+              setFinancialData={setFinancialData} // Pass the setFinancialData function
+              onSave={handleSave} // Pass the handleSave function as the onSave prop
+              onDelete={handleDelete} // Pass the handleDelete function as the onDelete prop
+              onSubtotalChange={handleSubtotalChange} // Pass the function to FinancialList
+              setLabels={setLabels} // Pass the setLabels function
+              setDates={setDates} // Pass the setDates function
+              setCurrentPosition={setCurrentPosition} // Pass the setCurrentPosition function
+              setItemSubtotals={setItemSubtotals} // Pass setItemSubtotals
+            />
+
+            <View style={styles.grandTotalContainer}>
+              <Text style={styles.grandTotalText}>Grand Total:</Text>
+              <Text style={styles.grandTotalAmount}>
+                ${calculatedSummary.grandTotal.toFixed(2).toString()}
+              </Text>
+            </View>
+
+            <View style={styles.financialSummary}>
+              <View style={styles.summaryItemContainer}>
+                <Text style={styles.summaryItemLabel}>Approved Job Value:</Text>
+                <Text style={styles.summaryItemValue}>
+                  ${calculatedSummary.approvedJobValue.toFixed(2).toString()}
+                </Text>
+              </View>
+
+              <View style={styles.summaryItemContainer}>
+                <Text style={styles.summaryItemLabel}>Collected:</Text>
+                <Text style={styles.summaryItemValue}>
+                  ${calculatedSummary.collectedAmount.toFixed(2).toString()}
+                </Text>
+              </View>
+
+              <View style={styles.summaryItemContainer}>
+                <Text style={styles.summaryItemLabel}>Balance Due:</Text>
+                <Text
+                  style={[
+                    styles.summaryItemValue,
+                    {color: Colors.success, fontWeight: 'bold'},
+                  ]}>
+                  ${calculatedSummary.balanceDue.toFixed(2).toString()}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </ScrollView>
+      )}
+
+      {activeTab === 'Invoices' && (
+        <ScrollView style={{flex: 1}}>
+          <InvoicesList
+            data={invoicesData}
+            // loading={invoicesLoading}
+            error={invoicesError}
+            selectedJob={selectedJob}
+            contractorId={contractorId}
           />
-          
-        </View>
-
-        <View style={styles.headerButtonsContainer}>
-          <TouchableOpacity style={styles.saveToApprovedButton}>
-            <Text style={styles.saveToApprovedText}>Save to Approved</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.addbutton} onPress={openModal}>
-            <Text style={styles.addtext}>+</Text>
-          </TouchableOpacity>
-        </View>
-
-        <FinancialList
-          data={financialData}
-          loading={financialLoading}
-          error={financialError}
-          selectedJob={selectedJob}
-          contractorId={contractorId}
-          openModal={openModal}
-          handleSaveFinancialData={handleSaveFinancialData}
-          onSave={handleSave} // Pass the handleSave function as the onSave prop
-          onDelete={handleDelete} // Pass the handleDelete function as the onDelete prop
-          onSubtotalChange={handleSubtotalChange} // Pass the function to FinancialList
-        />
-
-        <View style={styles.grandTotalContainer}>
-          <Text style={styles.grandTotalText}>Grand Total:</Text>
-          <Text style={styles.grandTotalAmount}>
-             ${calculatedSummary.grandTotal.toFixed(2).toString()}
-          </Text>
-        </View>
-
-        <View style={styles.financialSummary}>
-          <View style={styles.summaryItemContainer}>
-            <Text style={styles.summaryItemLabel}>Approved Job Value:</Text>
-            <Text style={styles.summaryItemValue}>
-             ${calculatedSummary.approvedJobValue.toFixed(2).toString()}
-            </Text>
-          </View>
-
-          <View style={styles.summaryItemContainer}>
-            <Text style={styles.summaryItemLabel}>Collected:</Text>
-            <Text style={styles.summaryItemValue}>
-             ${calculatedSummary.collectedAmount.toFixed(2).toString()}
-            </Text>
-          </View>
-
-          <View style={styles.summaryItemContainer}>
-            <Text style={styles.summaryItemLabel}>Balance Due:</Text>
-            <Text
-              style={[
-                styles.summaryItemValue,
-                {color: Colors.success, fontWeight: 'bold'},
-              ]}>
-              ${calculatedSummary.balanceDue.toFixed(2).toString()}
-            </Text>
-          </View>
-        </View>
-      </View>
-    </ScrollView>
-  )}
-
-{activeTab === 'Invoices' && (
-          <ScrollView style={{flex: 1}}>
-        <InvoicesList
-          data={invoicesData}
-          // loading={invoicesLoading}
-          error={invoicesError}
-          selectedJob={selectedJob}
-          contractorId={contractorId}
-        />
-     </ScrollView>
+        </ScrollView>
       )}
 
       {/* Category Selection Modal */}
@@ -460,7 +422,7 @@ function WorksheetTabs({selectedJob}) {
           <View style={modalStyles.modalContent}>
             <Text style={modalStyles.modalTitle}>Select Categories</Text>
             <ScrollView>
-              {categories.map((category) => (
+              {categories.map(category => (
                 <TouchableOpacity
                   key={category.id}
                   style={modalStyles.categoryItem}
@@ -473,7 +435,9 @@ function WorksheetTabs({selectedJob}) {
                       ]}
                     />
                   </View>
-                  <Text style={modalStyles.categoryLabel}>{category.label}</Text>
+                  <Text style={modalStyles.categoryLabel}>
+                    {category.label}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -497,7 +461,6 @@ function WorksheetTabs({selectedJob}) {
   );
 }
 
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -511,7 +474,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    marginHorizontal: 10
+    marginHorizontal: 10,
   },
   saveToApprovedButton: {
     backgroundColor: '#fff',
@@ -609,7 +572,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 10,
     // marginRight: 5,
     fontWeight: 'bold',
-
   },
   summaryItemValue: {
     flex: 1,
@@ -640,13 +602,13 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     textAlign: 'left',
-    fontWeight: 'bold'
+    fontWeight: 'bold',
   },
   grandTotalAmount: {
     color: '#fff',
     fontSize: 18,
     textAlign: 'right',
-    fontWeight: 'bold'
+    fontWeight: 'bold',
   },
 });
 

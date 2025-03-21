@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react'; //Import useEffect
+import React, {useState, useEffect, useCallback} from 'react';
 import {
   View,
   Text,
@@ -11,19 +11,30 @@ import {
 import Colors from '../../../assets/styling/colors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Collapsible from 'react-native-collapsible';
+import {getLoginDetails} from '../../../utils/AsyncStorage';
+import axios from 'axios';
+import config from '../../../config/config';
+import moment from 'moment'; // Import moment here
 
 const FinancialList = ({
-  data,
-  loading,
-  error,
   selectedJob,
   contractorId,
   openModal,
-  handleSaveFinancialData,
+  //handleSaveFinancialData,  // Remove as no longer needed.
   onSave,
   onDelete,
-  onSubtotalChange, // Add this prop to pass subtotal changes to parent
+  onSubtotalChange,
+  financialData,
+  setFinancialData, // Add this prop to update financialData in WorksheetTabs
+  setLabels,
+  setDates,
+  setCurrentPosition,
+  setItemSubtotals,
+  //setFinancialError // Remove if you're not using it in FinancialList
 }) => {
+  // const [financialData, setFinancialData] = useState([]); // Remove local state
+  const [loading, setLoading] = useState(true); // Initially true, since we're fetching
+  const [error, setError] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [editedItem, setEditedItem] = useState(null);
   const [editedValues, setEditedValues] = useState({});
@@ -32,10 +43,86 @@ const FinancialList = ({
   const [items, setItems] = useState([]); // State to hold added items
   const [editingAddedItemId, setEditingAddedItemId] = useState(null);
 
-  // useEffect hook to update subtotal when items or data changes
+  const fetchFinancialData = useCallback(async () => {
+    setLoading(true); // Set loading to true at the start
+    setError(null);
+
+    try {
+      const {access_token, contractor_id} = await getLoginDetails();
+
+      const response = await axios.post(
+        `${config.baseUrl}contractor/get-financial-worksheet`, // Updated Endpoint
+        {
+          contractor_id: contractor_id,
+          project_id: selectedJob.id,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+          },
+        },
+      );
+
+      const data = response.data;
+
+      console.log(selectedJob.id);
+      
+      if (data.success) {
+        const {
+          stages,
+          tracker,
+          worksheet,
+          grandtotal,
+          approvedjobvalue,
+          collected,
+        } = data.data;
+
+        setLabels(stages);
+
+        const trackerDates = tracker.map(item => {
+          return moment(item.created_at).format('DD/MM/YYYY'); // Format the date
+        });
+        setDates(trackerDates);
+
+        setCurrentPosition(tracker.length - 1);
+
+        // Initialize itemSubtotals based on the fetched data
+        const initialSubtotals = {};
+        worksheet.forEach(item => {
+          initialSubtotals[item.id] = parseFloat(item.subtotal || 0);
+        });
+        setItemSubtotals(initialSubtotals);
+        setFinancialData(worksheet); // Store the financial data in state
+      } else {
+        setError(data.message || 'Failed to load financial data.');
+        Alert.alert('Error', data.message || 'Failed to load financial data.');
+      }
+    } catch (error) {
+      console.error('Error fetching financial data:', error);
+      setError('Failed to load financial data.');
+      Alert.alert('Error', 'Failed to load financial data.');
+    } finally {
+      setLoading(false); // Set loading to false when done, whether success or error
+    }
+  }, [
+    selectedJob,
+    contractorId,
+    setFinancialData,
+    setLabels,
+    setDates,
+    setCurrentPosition,
+    setItemSubtotals,
+  ]);
+
+  // useEffect to fetch data when the component mounts or selectedJob/contractorId changes
   useEffect(() => {
-    if (data) {
-      data.forEach(item => {
+    fetchFinancialData();
+  }, [fetchFinancialData]);
+
+  // useEffect to update subtotal when items or data changes
+  useEffect(() => {
+    if (financialData) {
+      financialData.forEach(item => {
         const total =
           parseFloat(item.subtotal || 0) +
           items
@@ -47,14 +134,14 @@ const FinancialList = ({
         onSubtotalChange(item.id, total); //  Pass the total to the parent component
       });
     }
-  }, [data, items]); // Dependency array ensures this runs when data or items change
+  }, [financialData, items, onSubtotalChange]); // Dependency array ensures this runs when data or items change
 
   const handleEdit = item => {
     setEditMode(true);
     setEditedItem(item);
     setEditedValues({
-      name: item.name,
-      itemname: item.itemname,
+      name: item.category.name, // item.name -> item.category.name
+      itemname: item.items.length > 0 ? item.items[0].title : '', // Access title from the first item
       subtotal: item.subtotal.toString(),
       id: item.id,
     });
@@ -162,7 +249,9 @@ const FinancialList = ({
             if (deletedItem) {
               const parentItemId = deletedItem.parentItemId;
               // Recalculate subtotal for the parent item
-              const parentItem = data.find(item => item.id === parentItemId);
+              const parentItem = financialData.find(
+                item => item.id === parentItemId,
+              );
               const newTotal =
                 parseFloat(parentItem.subtotal || 0) +
                 items
@@ -194,7 +283,7 @@ const FinancialList = ({
     const updatedItem = items.find(item => item.id === itemId);
     if (updatedItem) {
       const parentItemId = updatedItem.parentItemId;
-      const parentItem = data.find(item => item.id === parentItemId);
+      const parentItem = financialData.find(item => item.id === parentItemId);
 
       if (parentItem) {
         const newTotal =
@@ -219,13 +308,13 @@ const FinancialList = ({
     return <Text style={styles.errorText}>{error}</Text>;
   }
 
-  if (!data || data.length === 0) {
+  if (!financialData || financialData.length === 0) {
     return <Text style={styles.noDataText}>No Financial Data Available</Text>;
   }
 
   return (
     <View>
-      {data.map((item, index) => (
+      {financialData.map((item, index) => (
         <View key={item.id} style={styles.financialItem}>
           <TouchableOpacity
             style={styles.listItem}
@@ -235,7 +324,7 @@ const FinancialList = ({
                 <Text style={styles.listItemHeaderText}>
                   {editMode && editedItem?.id === item.id
                     ? editedValues.name
-                    : item.name}
+                    : item.category.name}
                 </Text>
                 <Icon
                   name={isCollapsed(item.id) ? 'chevron-down' : 'chevron-up'}
@@ -312,9 +401,18 @@ const FinancialList = ({
                       onPress={() => handleEdit(item)}
                       style={styles.displayModeContent}>
                       <View style={styles.labelValueContainer}>
-                        <Text style={styles.financialItemValue}>
-                          {item.itemname || 'Item Name'}
-                        </Text>
+                        {item.items && item.items.length > 0 ? (
+                          item.items.map((i, index) => (
+                            <Text key={i.id} style={styles.financialItemValue}>
+                              {i.title}
+                              {index < item.items.length - 1 ? ', ' : ''}
+                            </Text>
+                          ))
+                        ) : (
+                          <Text style={styles.financialItemValue}>
+                            No Items
+                          </Text>
+                        )}
                       </View>
 
                       <View style={styles.labelValueContainer}>
@@ -382,7 +480,7 @@ const FinancialList = ({
                                 handleSaveAddedItem(addedItem.id);
 
                                 const parentItemId = addedItem.parentItemId;
-                                const parentItem = data.find(
+                                const parentItem = financialData.find(
                                   item => item.id === parentItemId,
                                 );
 
@@ -453,7 +551,7 @@ const FinancialList = ({
                 <Text style={styles.subtotalText}>
                   Sub Total:{' '}
                   <Text style={styles.boldSubtotal}>
-                    {item.name} $
+                    {item.category.name} $
                     {parseFloat(item.subtotal || 0) +
                       items
                         .filter(addedItem => addedItem.parentItemId === item.id)

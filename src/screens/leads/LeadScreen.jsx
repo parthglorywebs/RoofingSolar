@@ -49,6 +49,12 @@ const FilterChip = ({stage, onClose}) => {
 const LeadScreen = ({route}) => {
   const itemData = route?.params?.itemData;
   const navigation = useNavigation();
+  const [pagination, setPagination] = useState({
+    current_page: 0,
+    last_page: 10,
+    per_page: 10,
+    total: 0,
+  });
   const [modalVisibleAdvance, setModalVisibleAdvance] = useState(false);
   const [projectName, setProjectName] = useState('');
   const [email, setEmail] = useState('');
@@ -82,87 +88,168 @@ const LeadScreen = ({route}) => {
   const [selectedChip, setSelectedChip] = useState(null);
 
   const flatListRef = useRef(null);
-  
-  useEffect(() => {
-    if (itemData) {
-      // console.log('Item Data on Leads screen:', itemData);
-      setStageInfo(itemData);
-    }
-  }, [itemData]);
 
-  useEffect(() => {
-    fetchProjectList(selectedFilterStage, 1); // Fetch initial data
-  }, [fetchProjectList, selectedFilterStage]);
+  const loadMoreData = useCallback(async () => {
+    // Prevent loading if already on last page
 
-  const fetchProjectList = useCallback(
-    async (stage, page) => {
+    if (pagination.current_page >= pagination.last_page || isFetchingMore)
+      return;
+
+    setIsFetchingMore(true);
+
+    try {
       const {access_token, contractor_id} = await getLoginDetails();
-      try {
-        // Removed setLoading(true) here
+      const nextPage = pagination.current_page + 1;
+      console.log(selectedFilterStage, 'selectedFilterStage');
 
-        setErrorList(null); // Clear any existing errors
-        setIsFetchingMore(true); // Start loading
+      const requestData = {
+        contractor_id,
+        stage: selectedFilterStage,
+        page: nextPage,
+      };
 
-        const requestData = {
-          contractor_id: contractor_id,
-          stage: stage || '',
-          page: page,
-        };
-
-        const response = await axios.post(
-          `${config.baseUrl}contractor/project-listing`,
-          requestData,
-          {
-            headers: {
-              Authorization: `Bearer ${access_token}`,
-            },
+      const response = await axios.post(
+        `${config.baseUrl}contractor/project-listing`,
+        requestData,
+        {
+          headers: {
+            Authorization: `Bearer ${access_token}`,
           },
+        },
+      );
+
+      const sources = response.data;
+      const newData = sources?.data?.data ?? [];
+      const paginationInfo = sources?.data?.pagination ?? {};
+
+      // Filter out duplicates before appending
+      setProjectListData(prevData => {
+        const existingIds = new Set(prevData.map(item => item.id));
+        const filteredNewData = newData.filter(
+          item => !existingIds.has(item.id),
         );
+        return [...prevData, ...filteredNewData];
+      });
 
-        if (
-          response &&
-          response.data &&
-          response.data.success &&
-          response.data.data &&
-          response.data.data.data
-        ) {
-          const newData = response.data.data.data;
-          const paginationInfo = response.data.data.pagination;
+      setPagination(paginationInfo);
+    } catch (error) {
+      console.error('Load more error:', error);
+    } finally {
+      setIsFetchingMore(false);
+    }
+  }, [
+    pagination.current_page,
+    pagination.last_page,
+    isFetchingMore,
+    selectedFilterStage,
+  ]);
 
-          // Update state based on whether we're loading initial data or fetching more 
-          if (page === 1) {
-            // Initial load: replace existing data
-            setProjectListData(newData);
-          } else {
-            // Subsequent loads: append new data to existing data
-            setProjectListData(prevData => [...prevData, ...newData]);   
-          }
+  useEffect(() => {
+    if (itemData?.currentStage !== stageInfo?.currentStage) {
+      setProjectListData([]);
+      setPagination({
+        current_page: 0,
+        last_page: 1, // Use 1 to trigger the first page
+        per_page: 10,
+        total: 0,
+      });
+      setStageInfo(itemData);
+      setSelectedFilterStage(itemData?.currentStage);
+    }
+  }, []);
 
-          setLastPage(paginationInfo.last_page);
-          setCurrentPage(paginationInfo.current_page);
-        } else {
-          console.error('No Data found for Project List.');
-          setErrorList('No data received');
-          if (page === 1) {
-            setProjectListData([]); // Clear the project list only on the first page
-          }
-        }
+  useEffect(() => {
+    if (stageInfo && itemData?.currentStage !== stageInfo?.currentStage) {
+      setProjectListData([]);
+      setPagination({
+        current_page: 0,
+        last_page: 1, // Use 1 to trigger the first page
+        per_page: 10,
+        total: 0,
+      });
+      setStageInfo(itemData);
+      setSelectedFilterStage(itemData?.currentStage);
+    }
+  }, [itemData, stageInfo]);
 
-        // setLoading(false);  Removed
-        setIsFetchingMore(false); // Reset fetching more state
-      } catch (error) {
-        console.error('Error fetching contractor profile:', error);
-        // setLoading(false); Removed
-        setIsFetchingMore(false); // Reset fetching more state
-        setErrorList('Failed to load project list.');
-      }
-    },
-    [],
-  );
+  // Separate effect that triggers load when stageInfo is set
+  useEffect(() => {
+    if (stageInfo?.currentStage) {
+      loadMoreData();
+    }
+  }, [stageInfo]);
+
+  // useEffect(() => {
+  //   fetchProjectList(selectedFilterStage, 1); // Fetch initial data
+  // }, [fetchProjectList, selectedFilterStage]);
+
+  // const fetchProjectList = useCallback(async (stage, page) => {
+  //   const {access_token, contractor_id} = await getLoginDetails();
+  //   try {
+  //     // Removed setLoading(true) here
+
+  //     setErrorList(null); // Clear any existing errors
+  //     setIsFetchingMore(true); // Start loading
+
+  //     const requestData = {
+  //       contractor_id: contractor_id,
+  //       stage: stage || '',
+  //       page: page,
+  //     };
+
+  //     const response = await axios.post(
+  //       `${config.baseUrl}contractor/project-listing`,
+  //       requestData,
+  //       {
+  //         headers: {
+  //           Authorization: `Bearer ${access_token}`,
+  //         },
+  //       },
+  //     );
+
+  //     if (
+  //       response &&
+  //       response.data &&
+  //       response.data.success &&
+  //       response.data.data &&
+  //       response.data.data.data
+  //     ) {
+  //       const newData = response.data.data.data;
+  //       console.log(newData.length, 'newData');
+  //       const paginationInfo = response.data.data.pagination;
+
+  //       // Update state based on whether we're loading initial data or fetching more
+  //       if (page === 1) {
+  //         // Initial load: replace existing data
+  //         setProjectListData(newData);
+  //       } else {
+  //         // Subsequent loads: append new data to existing data
+  //         setProjectListData(prevData => [...prevData, ...newData]);
+  //       }
+
+  //       setLastPage(paginationInfo.last_page);
+  //       setCurrentPage(paginationInfo.current_page);
+  //     } else {
+  //       console.error('No Data found for Project List.');
+  //       setErrorList('No data received');
+  //       if (page === 1) {
+  //         setProjectListData([]); // Clear the project list only on the first page
+  //       }
+  //     }
+
+  //     // setLoading(false);  Removed
+  //     setIsFetchingMore(false); // Reset fetching more state
+  //   } catch (error) {
+  //     console.error('Error fetching contractor profile:', error);
+  //     // setLoading(false); Removed
+  //     setIsFetchingMore(false); // Reset fetching more state
+  //     setErrorList('Failed to load project list.');
+  //   }
+  // }, []);
 
   const handleLoadMore = () => {
-    if (currentPage < lastPage && !isFetchingMore && !loading) {
-      fetchProjectList(selectedFilterStage, currentPage + 1); // Now the function setIsFetchingMore(true) from starting of function fetchProjectList
+    if (pagination.current_page < pagination.last_page) {
+      loadMoreData(); // Now the function setIsFetchingMore(true) from starting of function fetchProjectList
     }
   };
 
@@ -183,15 +270,27 @@ const LeadScreen = ({route}) => {
 
   const handleStageSelect = stage => {
     setSelectedFilterStage(stage);
-    setCurrentPage(1); // Reset to first page when stage changes
-    fetchProjectList(stage, 1); // Fetch data for the selected stage
+    setProjectListData([]);
+    setPagination({
+      current_page: 0,
+      last_page: 1, // Use 1 to trigger the first page
+      per_page: 10,
+      total: 0,
+    });
+    setStageInfo(prev => ({...prev, stage: stage}));
     closeFilterModal();
   };
 
   const handleResetFilter = () => {
     setSelectedFilterStage(null);
-    setCurrentPage(1); // Reset to first page when filter is reset
-    fetchProjectList(null, 1); // Fetch all data
+    setPagination({
+      current_page: 0,
+      last_page: 1, // Use 1 to trigger the first page
+      per_page: 10,
+      total: 0,
+    });
+    setProjectListData([]);
+    setStageInfo(prev => ({...prev, stage: null}));
     closeFilterModal();
   };
 
@@ -265,7 +364,15 @@ const LeadScreen = ({route}) => {
       if (response && response.data && response.data.success) {
         Alert.alert('Success', 'Project Added Successfully');
         closeModalAdvance();
-        fetchProjectList(selectedFilterStage, 1); // Refresh data from page 1 after adding a project
+        setSelectedFilterStage('lead');
+        setPagination({
+          current_page: 0,
+          last_page: 1, // Use 1 to trigger the first page
+          per_page: 10,
+          total: 0,
+        });
+        setProjectListData([]);
+        setStageInfo(prev => ({...prev, stage: 'lead'}));
       } else {
         Alert.alert('Failed', 'Failed to add project');
       }
@@ -283,7 +390,6 @@ const LeadScreen = ({route}) => {
     name,
     address,
     closeModalAdvance,
-    fetchProjectList,
     selectedFilterStage,
   ]);
 
@@ -295,24 +401,28 @@ const LeadScreen = ({route}) => {
   );
 
   const handlePropertyDetail = useCallback(
-    (project) => {
-    if (!project) {
-      console.warn('selectedJob is undefined, cannot navigate to PropertyInfo');
-      return;
-    }
+    project => {
+      if (!project) {
+        console.warn(
+          'selectedJob is undefined, cannot navigate to PropertyInfo',
+        );
+        return;
+      }
 
-    navigation.navigate('PropertyInfo', {
-      itemData: {
-        ...project, // Use the passed project directly
-        currentStage: itemData?.currentStage || project?.stage_name,
-        progress: project.progress?.props?.progress,
-        totalAmount: project?.balancedue?.totalAmount,
-        balanceDue: project?.balancedue?.balanceDue,
-        percentage: project?.balancedue?.percentage,
-      },
-      selectedJob: project,
-    });
-  }, [navigation, itemData]);
+      navigation.navigate('PropertyInfo', {
+        itemData: {
+          ...project, // Use the passed project directly
+          currentStage: itemData?.currentStage || project?.stage_name,
+          progress: project.progress?.props?.progress,
+          totalAmount: project?.balancedue?.totalAmount,
+          balanceDue: project?.balancedue?.balanceDue,
+          percentage: project?.balancedue?.percentage,
+        },
+        selectedJob: project,
+      });
+    },
+    [navigation, itemData],
+  );
 
   const renderItem = useCallback(
     ({item}) => {
@@ -342,7 +452,7 @@ const LeadScreen = ({route}) => {
   );
 
   const getCircleColors = useCallback(
-    (currentStage) => {
+    currentStage => {
       switch (currentStage) {
         case 'lead':
           return {textColor: '#6691E7', backgroundColor: '#E8EFFB'};
@@ -355,7 +465,7 @@ const LeadScreen = ({route}) => {
         case 'invoice':
           return {textColor: '#865CE2', backgroundColor: '#EDE7FB'};
         default:
-          case 'lead':
+        case 'lead':
           return {textColor: '#6691E7', backgroundColor: '#E8EFFB'};
       }
     },
@@ -363,7 +473,7 @@ const LeadScreen = ({route}) => {
   );
 
   const getCircleInfo = useCallback(
-    (currentStage) => {
+    currentStage => {
       const {textColor, backgroundColor} = getCircleColors(
         currentStage?.toLowerCase(),
         isDarkMode,
@@ -374,20 +484,24 @@ const LeadScreen = ({route}) => {
   );
 
   const filteredProjects = useMemo(() => {
-    if (!searchText) {
-      return projectListData;
-    }
-
     const lowerCaseSearchText = searchText.toLowerCase();
 
-    return projectListData.filter(project => {
-      const titleMatch = project.title
-        ?.toLowerCase()
-        .includes(lowerCaseSearchText);
-      const nameMatch = project.name
-        ?.toLowerCase()
-        .includes(lowerCaseSearchText);
-      return titleMatch || nameMatch;
+    return (projectListData ?? []).filter(project => {
+      const {
+        title = '',
+        customer_name = '',
+        user_email = '',
+        id = '',
+        address = '',
+      } = project;
+
+      return (
+        title.toLowerCase().includes(lowerCaseSearchText) ||
+        customer_name.toLowerCase().includes(lowerCaseSearchText) ||
+        user_email.toLowerCase().includes(lowerCaseSearchText) ||
+        id.toString().toLowerCase().includes(lowerCaseSearchText) ||
+        address.toLowerCase().includes(lowerCaseSearchText)
+      );
     });
   }, [searchText, projectListData]);
 
@@ -414,14 +528,15 @@ const LeadScreen = ({route}) => {
       // Only show the message when all pages are loaded and there's media
       return (
         <TouchableOpacity
-          style={{ paddingVertical: 20, alignItems: 'center' }}
+          style={{paddingVertical: 20, alignItems: 'center'}}
           onPress={() => {
             if (flatListRef.current) {
-              flatListRef.current.scrollToOffset({ offset: 0, animated: true });
+              flatListRef.current.scrollToOffset({offset: 0, animated: true});
             }
-          }}
-        >
-          <Text style={{ color: '#888' }}>You have reached project list limit.  Tap to return to top</Text>
+          }}>
+          <Text style={{color: '#888'}}>
+            You have reached project list limit. Tap to return to top
+          </Text>
         </TouchableOpacity>
       );
     }
@@ -431,7 +546,8 @@ const LeadScreen = ({route}) => {
   const renderProjectList = useMemo(
     () =>
       filteredProjects.map((project, index) => {
-        const stageForCircleInfo = selectedFilterStage || itemData?.currentStage || project?.stage_name;
+        const stageForCircleInfo =
+          selectedFilterStage || itemData?.currentStage || project?.stage_name;
         const circleText = stageForCircleInfo?.charAt(0)?.toUpperCase() || 'L';
         const circleInfo = getCircleInfo(stageForCircleInfo);
         const passedTextColor = itemData?.textColor;
@@ -440,9 +556,9 @@ const LeadScreen = ({route}) => {
           <TouchableOpacity
             key={index}
             style={styles.jobActivityCard}
-            onPress={() => 
-            // openModal(project)
-            handlePropertyDetail(project)
+            onPress={() =>
+              // openModal(project)
+              handlePropertyDetail(project)
             }>
             <View style={styles.rowContainer}>
               <View
@@ -463,16 +579,40 @@ const LeadScreen = ({route}) => {
                 {[
                   {
                     label: `${project.title}`,
+                    icon: null,
                     isBold: true,
                     color: Colors.themeBlack,
                   },
                   {
+                    label: project.user_email ? project.user_email : '---',
+                    icon: 'email-outline',
+                    isBold: false,
+                    color: Colors.themeBlack,
+                  },
+                  {
+                    label: project.customer_number
+                      ? project.customer_number
+                      : '---',
+                    icon: 'phone-outline',
+                    isBold: false,
+                    color: Colors.themeBlack,
+                  },
+                  {
                     label: project.address ? project.address : '---',
+                    icon: 'map-marker-outline',
                     isBold: false,
                     color: project.address ? Colors.primary : Colors.red,
                   },
                 ].map((item, idx) => (
                   <View key={idx} style={styles.activityValueRow}>
+                    {item.icon && (
+                      <MaterialCommunityIcons
+                        name={item.icon}
+                        size={16}
+                        color={item.color}
+                        style={{marginRight: 6}}
+                      />
+                    )}
                     <Text
                       style={[
                         styles.activityLabel,
@@ -654,9 +794,7 @@ const LeadScreen = ({route}) => {
           // backgroundColor: Colors.light,
         }}>
         <View style={styles.resultRow}>
-          <Text style={styles.resultText}>
-            Result ({filteredProjects.length})
-          </Text>
+          <Text style={styles.resultText}>Result ({pagination.total})</Text>
           <View style={styles.buttonContainer}>
             <TouchableOpacity
               style={[styles.filterButton, {backgroundColor: Colors.white}]}
@@ -698,7 +836,7 @@ const LeadScreen = ({route}) => {
             value={searchText}
           />
         </View>
-        {loading && currentPage === 1 ? (
+        {loading && pagination.current_page === 1 ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={Colors.primary} />
           </View>
@@ -1044,7 +1182,7 @@ const LeadScreen = ({route}) => {
     isFetchingMore,
     currentPage,
     renderEmptyState,
-    getCircleColors
+    getCircleColors,
   ]);
 
   return (
@@ -1054,7 +1192,7 @@ const LeadScreen = ({route}) => {
         backgroundColor={backgroundStyle.backgroundColor}
       />
       <FlatList
-        ref={flatListRef} 
+        ref={flatListRef}
         data={[{key: 'content', component: renderContent}]}
         keyExtractor={item => item.key}
         renderItem={() => renderContent}
@@ -1065,7 +1203,6 @@ const LeadScreen = ({route}) => {
     </SafeAreaView>
   );
 };
-
 
 const styles = StyleSheet.create({
   filterHeader: {
@@ -1084,7 +1221,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 10,
     padding: 20,
-    marginHorizontal: 20
+    marginHorizontal: 20,
   },
   filterChipContainer: {
     paddingHorizontal: 20,

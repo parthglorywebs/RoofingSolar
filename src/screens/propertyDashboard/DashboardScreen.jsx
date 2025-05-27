@@ -60,7 +60,6 @@ const DashboardScreen = () => {
       setProjectCount(data.data.projectcount || 0);
       setActivityData(data.data.activity);
       setLoading(false);
-      
     } catch (error) {
       console.error('Error fetching contractor profile:', error);
       setLoading(false);
@@ -151,7 +150,12 @@ const DashboardScreen = () => {
         <View style={styles.gridItem}>
           <View style={styles.textContainer}>
             <Text style={styles.gridText}>{item.pipeline || '0'}</Text>
-            <Text style={styles.subText}>{item.total || '0'}</Text>
+            <Text style={styles.subText}>
+              {Number(item.total || '0').toLocaleString('en-US', {
+                style: 'currency',
+                currency: 'USD',
+              })}
+            </Text>
           </View>
           <View style={[styles.circle, {backgroundColor}]}>
             <Text style={[styles.circleText, {color: textColor}]}>
@@ -178,7 +182,13 @@ const DashboardScreen = () => {
       {label: 'New Leads', value: activity.jobs_leads || 0},
       {label: 'Jobs Approved', value: activity.jobs_approved || 0},
       {label: 'Jobs Completed', value: activity.jobs_completed || 0},
-      {label: 'Money Collected', value: activity.jobs_money_collected || 0},
+      {
+        label: 'Money Collected',
+        value: `${Number(activity.jobs_money_collected || 0).toLocaleString(
+          'en-US',
+          {style: 'currency', currency: 'USD'},
+        )}`,
+      },
       {label: 'Jobs Invoiced', value: activity.jobs_invoiced || 0},
       {label: 'Jobs Closed', value: activity.jobs_closed || 0},
     ];
@@ -187,13 +197,9 @@ const DashboardScreen = () => {
       <React.Fragment key={index}>
         <TouchableOpacity
           style={styles.activityValueRow}
-          onPress=
-          {
-            () => {
-              // handleLeads(item)
-
-            }}
-          >
+          onPress={() => {
+            // handleLeads(item)
+          }}>
           <Text style={styles.activityLabel}>{item.label}</Text>
           <Text
             style={{
@@ -267,11 +273,11 @@ const DashboardScreen = () => {
     navigation.navigate('Leads', {itemData: item});
   };
 
-  const handleRowPress =  (item) => {
+  const handleRowPress = item => {
     // console.log('Navigating with item.currentStage:', item.currentStage);
     navigation.navigate('Leads', {
-        screen: 'LeadsInner',
-        params: { itemData: item },
+      screen: 'LeadsInner',
+      params: {itemData: item},
     });
   };
 

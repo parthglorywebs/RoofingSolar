@@ -13,9 +13,12 @@ import {
   ActivityIndicator,
   TextInput,
   ScrollView,
+  Platform,
+  PermissionsAndroid,
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import {launchImageLibrary} from 'react-native-image-picker';
+import ImageResizer from '@bam.tech/react-native-image-resizer';
 import moment from 'moment';
 import axios from 'axios';
 import config from '../../config/config';
@@ -26,6 +29,9 @@ import Colors from '../../assets/styling/colors';
 import {Calendar} from 'react-native-calendars';
 import ImageViewer from 'react-native-image-zoom-viewer';
 import FastImage from 'react-native-fast-image';
+import BackgroundService from 'react-native-background-actions';
+// import notifee, {AndroidImportance} from '@notifee/react-native';
+import {getImageUrlByType} from '../../utils/common';
 
 const {width, height} = Dimensions.get('window');
 
@@ -60,12 +66,21 @@ const PhotosVideoScreen = ({selectedJob}) => {
   const [mediaMenuVisible, setMediaMenuVisible] = useState(false);
   const [selectedMediaForMenu, setSelectedMediaForMenu] = useState(null);
   const [settingCoverPhoto, setSettingCoverPhoto] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0); // percentage (0–100)
+  const [isUploading, setIsUploading] = useState(false);
+  const [currentUploadFileName, setCurrentUploadFileName] = useState('');
 
   // Pagination states
   const [page, setPage] = useState(1); // Current page number
   const [totalPages, setTotalPages] = useState(1); // Total number of pages
   const [isFetchingMore, setIsFetchingMore] = useState(false); // Loading state for pagination
   const [initialLoad, setInitialLoad] = useState(true); // Track the initial data fetch
+  const [uploadingStatus, setUploadingStatus] = useState({
+    processing: 0,
+    completed: 0,
+    total: 0,
+    inProgress: false,
+  });
 
   useEffect(() => {
     fetchInitialData();
@@ -146,20 +161,39 @@ const PhotosVideoScreen = ({selectedJob}) => {
           // console.log('No Photos and videos found');
         } else if (data && data.data) {
           const grouped = data.data.data.reduce((acc, dayData) => {
-            const dayItems = dayData.is_item.map(item => ({
-              uri: `${config.profileImage}storage/project_images/${item.project_image}`,
-              type: item.media_type,
-              notes: item.notes,
-              postedTime: item.created_at,
-              date: dayData.is_date,
-              mediaId: item.id,
-              created_by: item.created_by,
-            }));
+            const dayItems = dayData.is_item
+              .map(item => {
+                const thumbUrl = getImageUrlByType(
+                  item.project_image,
+                  'thumbnail',
+                );
+                const galleryUrl = getImageUrlByType(
+                  item.project_image,
+                  'gallery',
+                );
 
-            if (!acc[dayData.is_date]) {
-              acc[dayData.is_date] = [];
+                if (!thumbUrl || !galleryUrl) return null;
+
+                return {
+                  uri: thumbUrl,
+                  galleryUrl: galleryUrl,
+                  type: item.media_type,
+                  notes: item.notes,
+                  postedTime: item.created_at,
+                  date: dayData.is_date,
+                  mediaId: item.id,
+                  created_by: item.created_by,
+                };
+              })
+              .filter(Boolean); // Removes any null items
+
+            if (dayItems.length > 0) {
+              if (!acc[dayData.is_date]) {
+                acc[dayData.is_date] = [];
+              }
+              acc[dayData.is_date].push(...dayItems);
             }
-            acc[dayData.is_date].push(...dayItems);
+
             return acc;
           }, {});
 
@@ -206,70 +240,538 @@ const PhotosVideoScreen = ({selectedJob}) => {
     [selectedJob],
   );
 
+  const sleep = time => new Promise(resolve => setTimeout(resolve, time));
+
+  const backgroundUploadTask = async (
+    taskData,
+    onProgressUpdate,
+    onFileChange,
+    onUploadError, // Pass this from the caller to close modal & alert
+  ) => {
+    const {files} = taskData;
+    let totalSteps = 0;
+    let completedSteps = 0;
+
+    try {
+      // Step 1: Calculate total steps
+      for (let file of files) {
+        const presignedUrls = await getPresignedUrls(file); // may throw
+        totalSteps += presignedUrls.length;
+      }
+
+      // Step 2: Start uploading
+      for (let fileIndex = 0; fileIndex < files.length; fileIndex++) {
+        const file = files[fileIndex];
+        onFileChange(file.name || file.fileName || 'Unnamed File');
+
+        const extension = getExtensionFromUri(file.uri);
+        const format = getFormatFromExtension(extension);
+        const mimeType = file.type;
+        const originalWidth = file.width;
+        const originalHeight = file.height;
+
+        const presignedUrls = await getPresignedUrls(file); // may throw
+        const media_variants = [];
+
+        for (let urlIndex = 0; urlIndex < presignedUrls.length; urlIndex++) {
+          const url = presignedUrls[urlIndex];
+          let resizedFile = file;
+          const targetSize = getTargetSizeForKey(url.key);
+
+          if (targetSize) {
+            const {width, height} = calculateAspectFitSize(
+              originalWidth,
+              originalHeight,
+              targetSize.width,
+              targetSize.height,
+            );
+            resizedFile = await resizeImage(file, width, height, format);
+          }
+
+          const uploadedUrl = await uploadToS3(
+            url.url,
+            resizedFile.uri,
+            mimeType,
+          );
+          if (!uploadedUrl) continue;
+
+          media_variants.push({
+            key: url.key,
+            filename: getFileNameFromUrl(uploadedUrl),
+            type: file.type,
+            size: resizedFile.size || file.fileSize || 0,
+          });
+
+          completedSteps++;
+          const progress = Math.round((completedSteps / totalSteps) * 100);
+          onProgressUpdate(progress);
+          await sleep(100);
+        }
+
+        await storeMetadata({
+          project_id: selectedJob.id,
+          uuid: '59d09068-6f3d-482d-b166-fc29a8a13b31',
+          media_variants,
+        });
+      }
+
+      onProgressUpdate(100);
+    } catch (error) {
+      // Alert + stop modal
+      onUploadError?.(error); // Call the callback to alert + close modal
+    } finally {
+      await BackgroundService.stop();
+    }
+  };
+
+  const handleUploadError = error => {
+    Alert.alert(
+      'Upload Failed',
+      'Something went wrong during upload. Please try again.',
+    );
+    setUploading(false); // Close modal or spinner
+  };
+
   const handleLoadMore = () => {
     if (!isFetchingMore && page < totalPages) {
       fetchPhotoVideos(page + 1); // Load the next page
     }
   };
 
-  const handleAddMedia = useCallback(async () => {
-    launchImageLibrary(
-      {
+  const pickImage = async () => {
+    try {
+      const response = await launchImageLibrary({
         mediaType: 'mixed',
         quality: 1,
         selectionLimit: 0,
-      },
-      async response => {
-        if (response.didCancel) {
-          // console.log('User cancelled image picker');
-          return;
-        } else if (response.errorCode) {
-          console.error('ImagePicker Error: ', response.errorMessage);
-          Alert.alert('Error', 'Failed to select media.');
-          return;
-        }
+      });
+      if (response.didCancel || response.errorCode) return null;
+      return response.assets;
+    } catch (error) {
+      console.error('❌ Error picking image:', error);
+      return null;
+    }
+  };
 
-        setUploading(true);
-        try {
-          const {access_token, contractor_id} = await getLoginDetails();
-          const formData = new FormData();
-          formData.append('contractor_id', contractor_id);
-          formData.append('project_id', selectedJob.id);
-          response.assets.forEach(asset => {
-            formData.append('uploadfile[]', {
-              uri: asset.uri,
-              type: asset.type,
-              name: asset.fileName || 'media',
-            });
-          });
+  const getPresignedUrls = async file => {
+    try {
+      const {access_token} = await getLoginDetails();
+      const formData = new FormData();
+      formData.append('project_id', selectedJob.id);
+      formData.append('filename', file.fileName);
+      formData.append('type', file.type);
 
-          const uploadResponse = await axios.post(
-            `${config.baseUrl}contractor/upload-photos-videos`,
-            formData,
-            {
-              headers: {
-                'Content-Type': 'multipart/form-data',
-                Authorization: `Bearer ${access_token}`,
-              },
-            },
-          );
+      const {data} = await axios.post(
+        `${config.baseUrl}contractor/get-presinged-urls`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            Authorization: `Bearer ${access_token}`,
+          },
+        },
+      );
 
-          if (uploadResponse.data.status === 200) {
-            // After successful upload, refresh the data from the first page
-            await fetchPhotoVideos(1);
-            Alert.alert('Success', 'Media uploaded successfully');
-          } else {
-            Alert.alert('Error', 'Failed to upload media.');
-          }
-        } catch (error) {
-          console.error('Error uploading media:', error);
-          Alert.alert('Error', 'Failed to upload media.');
-        } finally {
-          setUploading(false);
-        }
-      },
+      const urls = data?.presigned_urls || [];
+      if (!urls.length) {
+        throw new Error('No presigned URLs returned');
+      }
+
+      return urls;
+    } catch (error) {
+      console.error('❌ Error getting presigned URLs:', error.response);
+      throw error; // Let the upload function handle this
+    }
+  };
+
+  const getExtensionFromUri = uri =>
+    uri.match(/\.([a-zA-Z0-9]+)(\?.*)?$/)?.[1].toUpperCase() || 'JPEG';
+
+  const getFormatFromExtension = ext => {
+    switch (ext) {
+      case 'PNG':
+      case 'WEBP':
+        return ext;
+      case 'JPG':
+      case 'JPEG':
+      default:
+        return 'JPEG';
+    }
+  };
+
+  const uploadToS3 = async (url, fileUri, mimeType) => {
+    try {
+      const blob = await fetch(fileUri).then(res => res.blob());
+      const result = await fetch(url, {
+        method: 'PUT',
+        headers: {'Content-Type': mimeType},
+        body: blob,
+      });
+
+      if (!result.ok)
+        throw new Error(`Upload failed with status ${result.status}`);
+      return url;
+    } catch (error) {
+      console.error('❌ Upload error:', error);
+      return null;
+    }
+  };
+
+  const calculateAspectFitSize = (
+    originalWidth,
+    originalHeight,
+    maxWidth,
+    maxHeight,
+  ) => {
+    const ratio = Math.min(
+      maxWidth / originalWidth,
+      maxHeight / originalHeight,
     );
-  }, [fetchPhotoVideos, selectedJob]);
+    return {
+      width: Math.round(originalWidth * ratio),
+      height: Math.round(originalHeight * ratio),
+    };
+  };
+
+  const getFileNameFromUrl = url => {
+    const cleanUrl = url.split('?')[0];
+    return cleanUrl.substring(cleanUrl.lastIndexOf('/') + 1);
+  };
+
+  const resizeImage = async (file, width, height, format) => {
+    return ImageResizer.createResizedImage(
+      file.uri,
+      width,
+      height,
+      format,
+      100,
+    );
+  };
+
+  const storeMetadata = async ({project_id, uuid, media_variants}) => {
+    try {
+      const {access_token} = await getLoginDetails();
+      const formData = new FormData();
+      formData.append('project_id', project_id);
+      formData.append('uuid', uuid);
+
+      media_variants.forEach((variant, index) => {
+        formData.append(`media_variants[${index}][key]`, variant.key);
+        formData.append(`media_variants[${index}][filename]`, variant.filename);
+        formData.append(`media_variants[${index}][type]`, variant.type);
+        formData.append(`media_variants[${index}][size]`, String(variant.size));
+      });
+
+      const {data} = await axios.post(
+        `${config.baseUrl}contractor/store-metadata`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            Authorization: `Bearer ${access_token}`,
+          },
+        },
+      );
+
+      console.log('✅ Metadata stored successfully:', data);
+      fetchInitialData();
+      return data;
+    } catch (error) {
+      console.error(
+        '❌ Failed to store metadata:',
+        error.response?.data || error.message,
+      );
+      throw error;
+    }
+  };
+
+  const getTargetSizeForKey = key => {
+    switch (key) {
+      case 'gallery':
+        return {width: 1900, height: 1900};
+      case 'small':
+        return {width: 80, height: 80};
+      case 'thumbnail':
+        return {width: 218, height: 218};
+      case 'pdfimage':
+        return {width: 600, height: 450};
+      default:
+        return null;
+    }
+  };
+
+  const requestAndroidPermissions = async () => {
+    try {
+      const granted = await PermissionsAndroid.requestMultiple([
+        PermissionsAndroid.PERMISSIONS.FOREGROUND_SERVICE,
+        PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+        PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
+      ]);
+
+      const allGranted = Object.values(granted).every(
+        status => status === PermissionsAndroid.RESULTS.GRANTED,
+      );
+
+      if (!allGranted) {
+        Alert.alert(
+          'Permissions Required',
+          'All permissions are required to upload files.',
+        );
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.log('Error :', err);
+      return false;
+    }
+  };
+
+  const processAndUpload = async () => {
+    const files = await pickImage();
+    if (!files) return;
+
+    setUploadingStatus({
+      processing: 0,
+      completed: 0,
+      total: files.length,
+      inProgress: true,
+    });
+
+    const options = {
+      taskName: 'Uploader',
+      taskTitle: 'Uploading files',
+      taskDesc: 'Your files are uploading in the background',
+      taskIcon: {
+        name: 'ic_launcher',
+        type: 'mipmap',
+      },
+      color: '#ff00ff',
+      linkingURI: 'yourSchemeHere://myapp',
+      parameters: {
+        files,
+      },
+    };
+
+    try {
+      const check = BackgroundService.isRunning();
+      if (check) {
+        await BackgroundService.start(data => {
+          setIsUploading(true);
+          backgroundUploadTask(
+            data,
+            progress => setUploadProgress(progress),
+            fileName => setCurrentUploadFileName(fileName),
+            handleUploadError,
+          ).then(() => {
+            setIsUploading(false);
+            setCurrentUploadFileName('');
+          });
+        }, options);
+      } else {
+        setIsUploading(true);
+        backgroundUploadTask(
+          {files},
+          progress => setUploadProgress(progress),
+          fileName => setCurrentUploadFileName(fileName),
+          handleUploadError,
+        ).then(() => {
+          setIsUploading(false);
+          setCurrentUploadFileName('');
+        });
+      }
+    } catch (error) {
+      console.warn('Background service not available, uploading directly.');
+      // Fallback to direct upload
+      setIsUploading(true);
+      backgroundUploadTask(
+        {files},
+        progress => setUploadProgress(progress),
+        fileName => setCurrentUploadFileName(fileName),
+        handleUploadError,
+      ).then(() => {
+        setIsUploading(false);
+        setCurrentUploadFileName('');
+      });
+    } finally {
+      setUploadingStatus(prev => ({...prev, inProgress: false}));
+    }
+  };
+
+  // const handleAddMediaAndUpload = async () => {
+  //   try {
+  //     // Step 1: Select multiple images and videos
+  //     const response = await launchImageLibrary({
+  //       mediaType: 'mixed',
+  //       quality: 1,
+  //       selectionLimit: 0,
+  //     });
+  //     if (response.didCancel) return false;
+  //     if (response.errorCode) return false;
+  //     // const res = await new Promise((resolve, reject) => {
+  //     //   launchImageLibrary(
+  //     //     {
+  //     //       mediaType: 'mixed',
+  //     //       quality: 1,
+  //     //       selectionLimit: 0,
+  //     //     },
+  //     //     response => {
+  //     //       if (response.didCancel) return reject('User cancelled');
+  //     //       if (response.errorCode) return reject(response.errorMessage);
+  //     //       resolve(response.assets);
+  //     //     },
+  //     //   );
+  //     // });
+
+  //     const assets = response.assets;
+
+  //     const filesToUpload = [];
+
+  //     // Step 2: Process each asset
+  //     for (const asset of assets) {
+  //       console.log(asset, 'asset');
+  //       const {uri, type, fileName, width, height} = asset;
+
+  //       // if (type.startsWith('image')) {
+  //       //   // Resize to thumbnail
+  //       //   const thumb = await ImageResizer.createResizedImage(
+  //       //     uri,
+  //       //     80,
+  //       //     80,
+  //       //     'JPEG',
+  //       //     80,
+  //       //   );
+
+  //       //   // Resize to gallery
+  //       //   const gallery = await ImageResizer.createResizedImage(
+  //       //     uri,
+  //       //     800,
+  //       //     800,
+  //       //     'JPEG',
+  //       //     90,
+  //       //   );
+
+  //       //   filesToUpload.push(
+  //       //     {uri, type, fileName}, // original
+  //       //     {
+  //       //       uri: thumb.uri,
+  //       //       type: 'image/jpeg',
+  //       //       fileName: `thumb_${fileName}`,
+  //       //     },
+  //       //     {
+  //       //       uri: gallery.uri,
+  //       //       type: 'image/jpeg',
+  //       //       fileName: `gallery_${fileName}`,
+  //       //     },
+  //       //   );
+  //       // } else if (type.startsWith('video')) {
+  //       //   // Extract thumbnail for video
+  //       //   // const preview = await ProcessingManager.getPreviewForSecond(uri, 1);
+  //       //   // filesToUpload.push(
+  //       //   //   {uri, type, fileName}, // original video
+  //       //   //   {
+  //       //   //     uri: preview.path || preview.uri,
+  //       //   //     type: 'image/jpeg',
+  //       //   //     fileName: `video_thumb_${fileName}.jpg`,
+  //       //   //   },
+  //       //   // );
+  //       // }
+  //     }
+
+  //     // Step 3: Generate presigned URLs
+  //     const presignReq = filesToUpload.map(file => ({
+  //       filename: file.fileName,
+  //       type: file.type,
+  //     }));
+
+  //     const {data} = await axios.post(`${config.baseUrl}/get-presigned-urls`, {
+  //       files: presignReq,
+  //     });
+
+  //     const {presignedUrls} = data;
+
+  //     // Step 4: Upload each file
+  //     for (let i = 0; i < filesToUpload.length; i++) {
+  //       const file = filesToUpload[i];
+  //       const presignedUrl = presignedUrls[i];
+
+  //       const fileBlob = {
+  //         uri: file.uri,
+  //         type: file.type,
+  //         name: file.fileName,
+  //       };
+
+  //       await axios.put(presignedUrl, fileBlob, {
+  //         headers: {'Content-Type': file.type},
+  //       });
+
+  //       console.log(`✅ Uploaded ${file.fileName}`);
+  //     }
+
+  //     console.log('🎉 All files uploaded!');
+  //   } catch (err) {
+  //     console.error('❌ Upload failed:', err);
+  //   }
+  // };
+
+  // const handleAddMedia = useCallback(async () => {
+  //   launchImageLibrary(
+  //     {
+  //       mediaType: 'mixed',
+  //       quality: 1,
+  //       selectionLimit: 0,
+  //     },
+  //     async response => {
+  //       if (response.didCancel) {
+  //         // console.log('User cancelled image picker');
+  //         return;
+  //       } else if (response.errorCode) {
+  //         console.error('ImagePicker Error: ', response.errorMessage);
+  //         Alert.alert('Error', 'Failed to select media.');
+  //         return;
+  //       }
+
+  //       setUploading(true);
+  //       try {
+  //         const {access_token, contractor_id} = await getLoginDetails();
+  //         const formData = new FormData();
+  //         formData.append('contractor_id', contractor_id);
+  //         formData.append('project_id', selectedJob.id);
+  //         response.assets.forEach(asset => {
+  //           formData.append('uploadfile[]', {
+  //             uri: asset.uri,
+  //             type: asset.type,
+  //             name: asset.fileName || 'media',
+  //           });
+  //         });
+
+  //         const uploadResponse = await axios.post(
+  //           `${config.baseUrl}contractor/upload-photos-videos`,
+  //           formData,
+  //           {
+  //             headers: {
+  //               'Content-Type': 'multipart/form-data',
+  //               Authorization: `Bearer ${access_token}`,
+  //             },
+  //           },
+  //         );
+
+  //         if (uploadResponse.data.status === 200) {
+  //           // After successful upload, refresh the data from the first page
+  //           await fetchPhotoVideos(1);
+  //           Alert.alert('Success', 'Media uploaded successfully');
+  //         } else {
+  //           Alert.alert('Error', 'Failed to upload media.');
+  //         }
+  //       } catch (error) {
+  //         console.error('Error uploading media:', error);
+  //         Alert.alert('Error', 'Failed to upload media.');
+  //       } finally {
+  //         setUploading(false);
+  //       }
+  //     },
+  //   );
+  // }, [fetchPhotoVideos, selectedJob]);
 
   const openMediaMenu = item => {
     setSelectedMediaForMenu(item);
@@ -284,58 +786,58 @@ const PhotosVideoScreen = ({selectedJob}) => {
 
   // Function to handle setting the media as cover photo (placeholder)
   const handleSetAsCoverPhoto = () => {
-    Alert.alert(
-      "Are you sure?",
-      "You want to set this file as cover photo!",
-      [
-        {
-          text: "Cancel",
-          style: "cancel"
-        },
-        {
-          text: "Yes, Set as Cover Photo!",
-          onPress: async () => {
-            setSettingCoverPhoto(true); // Show loading indicator
-            try {
-              const {access_token, contractor_id} = await getLoginDetails();
-              const response = await axios.post(
-                `${config.baseUrl}contractor/set-cover-photos`,
-                {
-                  contractor_id: contractorId,
-                  project_id: selectedJob.id,
-                  media_id: selectedMediaForMenu.mediaId,
+    Alert.alert('Are you sure?', 'You want to set this file as cover photo!', [
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
+      {
+        text: 'Yes, Set as Cover Photo!',
+        onPress: async () => {
+          setSettingCoverPhoto(true); // Show loading indicator
+          try {
+            const {access_token, contractor_id} = await getLoginDetails();
+            const response = await axios.post(
+              `${config.baseUrl}contractor/set-cover-photos`,
+              {
+                contractor_id: contractorId,
+                project_id: selectedJob.id,
+                media_id: selectedMediaForMenu.mediaId,
+              },
+              {
+                headers: {
+                  'Content-Type': 'application/x-www-form-urlencoded',
+                  Authorization: `Bearer ${access_token}`,
                 },
-                {
-                  headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    Authorization: `Bearer ${access_token}`,
-                  },
-                },
+              },
+            );
+
+            if (response.data.success === true) {
+              console.log('Cover photo set successfully');
+              Alert.alert('Successfully', response.data.message);
+              // TODO: Invalidate cache of current project to force refresh cover image
+            } else {
+              Alert.alert(
+                'Error',
+                response.data.message || 'Failed to set cover photo',
               );
-
-              console.log('API Response:', response);
-
-              if (response.data.success === true) {
-                console.log('Cover photo set successfully');
-                Alert.alert('Successfully', response.data.message);
-                // TODO: Invalidate cache of current project to force refresh cover image
-              } else {
-                Alert.alert('Error', response.data.message || 'Failed to set cover photo');
-              }
-            } catch (error) {
-              console.error('Error setting cover photo:', error);
-              Alert.alert('Error', 'Failed to set cover photo');
-            } finally {
-              setSettingCoverPhoto(false); // Hide loading indicator
-              closeMediaMenu(); // Close the menu
-              console.log("Set as Cover Photo : " +selectedMediaForMenu.mediaId, contractorId, selectedJob.id);
             }
+          } catch (error) {
+            console.error('Error setting cover photo:', error);
+            Alert.alert('Error', 'Failed to set cover photo');
+          } finally {
+            setSettingCoverPhoto(false); // Hide loading indicator
+            closeMediaMenu(); // Close the menu
+            console.log(
+              'Set as Cover Photo : ' + selectedMediaForMenu.mediaId,
+              contractorId,
+              selectedJob.id,
+            );
           }
-        }
-      ]
-    );
+        },
+      },
+    ]);
   };
-
 
   const handleRemoveMedia = useCallback(
     (uri, mediaId, date) => {
@@ -414,6 +916,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
         <TouchableOpacity
           style={styles.mediaCard}
           onPress={() => {
+            console.log(item, 'item');
             setSelectedMedia(item);
             setModalVisible(true);
             setModalMediaLoading(true);
@@ -437,7 +940,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
                 resizeMode={FastImage.resizeMode.cover} // Or 'contain', 'stretch', etc.
               />
             ) : item.type && item.type.toLowerCase().includes('video') ? (
-              <View style={{position: 'relative', marginRight: 5,}}>
+              <View style={{position: 'relative', marginRight: 5}}>
                 <Video
                   source={{uri: item.uri}}
                   style={{
@@ -875,6 +1378,14 @@ const PhotosVideoScreen = ({selectedJob}) => {
 
   return (
     <View style={styles.container}>
+      {uploadingStatus.inProgress && (
+        <View style={styles.uploadStatusContainer}>
+          <ActivityIndicator size="small" color="#007bff" />
+          <Text style={styles.uploadStatusText}>
+            {uploadingStatus.completed}/{uploadingStatus.total}
+          </Text>
+        </View>
+      )}
       {apiLoading && initialLoad ? ( // Show loader if API is loading and it's the initial load
         <ActivityIndicator
           size="large"
@@ -908,7 +1419,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
         )}
         <TouchableOpacity
           style={[styles.addButton, {opacity: uploading ? 0.5 : 1}]}
-          onPress={handleAddMedia}
+          onPress={processAndUpload}
           disabled={uploading}>
           <MaterialCommunityIcons name="image-plus" size={20} color="white" />
         </TouchableOpacity>
@@ -935,18 +1446,18 @@ const PhotosVideoScreen = ({selectedJob}) => {
               <Text>Set as Cover Photo</Text>
             </TouchableOpacity> */}
             {selectedMediaForMenu &&
-                !(
-                  selectedMediaForMenu.type &&
-                  selectedMediaForMenu.type.toLowerCase().includes('video')
-                ) && (
-                  <TouchableOpacity
-                    style={styles.mediaMenuItem}
-                    onPress={() => {
-                      handleSetAsCoverPhoto();
-                    }}>
-                    <Text>Set as Cover Photo</Text>
-                  </TouchableOpacity>
-                )}
+              !(
+                selectedMediaForMenu.type &&
+                selectedMediaForMenu.type.toLowerCase().includes('video')
+              ) && (
+                <TouchableOpacity
+                  style={styles.mediaMenuItem}
+                  onPress={() => {
+                    handleSetAsCoverPhoto();
+                  }}>
+                  <Text>Set as Cover Photo</Text>
+                </TouchableOpacity>
+              )}
             <TouchableOpacity
               style={styles.mediaMenuItem}
               onPress={() => {
@@ -989,7 +1500,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
                   selectedMedia.type.toLowerCase().includes('image') && (
                     <FastImage // Use FastImage here
                       source={{
-                        uri: selectedMedia.uri, // Use thumbnail if available
+                        uri: selectedMedia.galleryUrl, // Use thumbnail if available
                         priority: FastImage.priority.high, // Or 'high', 'low'
                       }}
                       style={{width: '100%', height: 400}}
@@ -1076,6 +1587,21 @@ const PhotosVideoScreen = ({selectedJob}) => {
                 <Text style={styles.buttonText}>Apply</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+      <Modal visible={isUploading} transparent animationType="fade">
+        <View style={styles.uploadModalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Uploading Files...</Text>
+            <Text style={styles.fileNameText}>{currentUploadFileName}</Text>
+
+            <View style={styles.progressBarBackground}>
+              <View
+                style={[styles.progressBarFill, {width: `${uploadProgress}%`}]}
+              />
+            </View>
+            <Text>{uploadProgress}%</Text>
           </View>
         </View>
       </Modal>
@@ -1344,6 +1870,54 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.7)', // Optional background
     borderRadius: 12, // Make it circular
     padding: 2,
+  },
+  uploadStatusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 10,
+    width: '100%',
+    marginTop: 25,
+  },
+
+  uploadStatusText: {
+    marginLeft: 10,
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
+    flex: 1,
+    textAlign: 'right',
+  },
+
+  // Uploading Modal Style
+  uploadModalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  modalContent: {
+    width: 250,
+    padding: 20,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  progressBarBackground: {
+    width: '100%',
+    height: 10,
+    backgroundColor: '#ccc',
+    borderRadius: 5,
+    marginVertical: 10,
+  },
+  progressBarFill: {
+    height: 10,
+    backgroundColor: '#4caf50',
+    borderRadius: 5,
   },
 });
 

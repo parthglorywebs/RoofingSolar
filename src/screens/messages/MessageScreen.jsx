@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {
   SafeAreaView,
   StyleSheet,
@@ -12,7 +12,7 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
   Platform,
-  KeyboardAvoidingView
+  KeyboardAvoidingView,
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import Colors from '../../assets/styling/colors';
@@ -28,7 +28,7 @@ const MessagesScreen = ({selectedJob}) => {
   const [apiLoading, setApiLoading] = useState(true);
   const [postingComment, setPostingComment] = useState(false);
   const [userName, setUserName] = useState('');
-  const [isKeyboardVisible, setKeyboardVisible] = useState(false);  // Track keyboard visibility
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false); // Track keyboard visibility
 
   const textInputRef = useRef(null); // Create a ref
 
@@ -41,19 +41,18 @@ const MessagesScreen = ({selectedJob}) => {
     // textInputRef.current.focus();
   }, []);
 
-
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
       'keyboardDidShow',
       () => {
         setKeyboardVisible(true); // Set keyboard visible state
-      }
+      },
     );
     const keyboardDidHideListener = Keyboard.addListener(
       'keyboardDidHide',
       () => {
         setKeyboardVisible(false); // Set keyboard invisible state
-      }
+      },
     );
 
     return () => {
@@ -61,7 +60,6 @@ const MessagesScreen = ({selectedJob}) => {
       keyboardDidHideListener.remove();
     };
   }, []);
-
 
   const handlePostComment = async () => {
     const {newComment} = form;
@@ -97,6 +95,7 @@ const MessagesScreen = ({selectedJob}) => {
       );
 
       const data = response.data;
+      console.log(data, 'data');
 
       if (data && data.success && data.data.original.success) {
         const newCommentData = {
@@ -223,10 +222,9 @@ const MessagesScreen = ({selectedJob}) => {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 40 : 0}
-    >
+      style={{flex: 1}}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 40 : 0}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <SafeAreaView style={styles.container}>
           <View style={styles.inputContainer}>
@@ -239,7 +237,9 @@ const MessagesScreen = ({selectedJob}) => {
               ref={textInputRef}
               blurOnSubmit={false}
             />
-            <TouchableOpacity onPress={handlePostComment} disabled={postingComment}>
+            <TouchableOpacity
+              onPress={handlePostComment}
+              disabled={postingComment}>
               <View style={{flexDirection: 'row'}}>
                 <MaterialCommunityIcons
                   name={'image-multiple'}

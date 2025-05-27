@@ -8,7 +8,7 @@ import {
   Alert,
   Modal,
   FlatList,
-  ActivityIndicator
+  ActivityIndicator,
 } from 'react-native';
 import {launchImageLibrary} from 'react-native-image-picker';
 import {TextInput as PaperTextInput} from 'react-native-paper';
@@ -24,6 +24,7 @@ import config from '../../config/config';
 import countryData from '../../assets/countries.json';
 import Colors from '../../assets/styling/colors';
 import {useNavigation} from '@react-navigation/native';
+import {getImageUrlByType} from '../../utils/common';
 
 const Profile = () => {
   const navigation = useNavigation();
@@ -86,7 +87,11 @@ const Profile = () => {
       );
 
       const data = response.data;
-      const profileImage = data.data.profile_image;
+
+      const profileImage = getImageUrlByType(
+        data.data.profile_image,
+        'thumbnail',
+      );
 
       setForm({
         name: data.data.name || '',
@@ -101,9 +106,7 @@ const Profile = () => {
           ) || countryData[0],
       });
 
-      const imageUrl = profileImage
-        ? `${config.profileImage}${profileImage}`
-        : null;
+      const imageUrl = profileImage ? `${profileImage}` : null;
       setSelectedImage(imageUrl);
       setLoading(false);
     } catch (error) {
@@ -180,8 +183,6 @@ const Profile = () => {
     );
   };
 
- 
-
   const handleTextChange = (field, value) => {
     if (value.trim()) {
       setError(prevError => ({
@@ -247,7 +248,9 @@ const Profile = () => {
             onFocus={() => handleFocus('name')}
             error={!!error.name}
           />
-          {error.name ? <Text style={styles.errorText}>{error.name}</Text> : null}
+          {error.name ? (
+            <Text style={styles.errorText}>{error.name}</Text>
+          ) : null}
 
           <PaperTextInput
             style={[styles.textInput, styles.disabledInput]}
@@ -259,7 +262,7 @@ const Profile = () => {
           <View style={styles.imageContainer}>
             {selectedImage ? (
               <View style={styles.imageBox}>
-                <Image source={{ uri: selectedImage }} style={styles.image} />
+                <Image source={{uri: selectedImage}} style={styles.image} />
                 <TouchableOpacity
                   style={styles.closeIcon}
                   onPress={() => setSelectedImage(null)}>
@@ -333,9 +336,7 @@ const Profile = () => {
             <Text style={styles.errorText}>{error.zipCode}</Text>
           ) : null}
 
-          <TouchableOpacity
-            style={styles.submitButton}
-            onPress={handleSubmit}>
+          <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
             <Text style={styles.submitButtonText}>Get Started</Text>
           </TouchableOpacity>
         </>
@@ -364,7 +365,7 @@ const Profile = () => {
             )}
             <FlatList
               data={filteredCountryData}
-              renderItem={({ item }) => (
+              renderItem={({item}) => (
                 <TouchableOpacity
                   style={styles.modalItem}
                   onPress={() => handleCountrySelect(item)}>

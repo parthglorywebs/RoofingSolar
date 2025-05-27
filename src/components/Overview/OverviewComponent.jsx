@@ -55,9 +55,7 @@ const OverviewComponent = ({
           color={'#888'}
           style={{marginHorizontal: 5}}
         />
-        <Text style={styles.activityLabel}>
-          {label} 
-        </Text>
+        <Text style={styles.activityLabel}>{label}</Text>
         <Text
           style={{
             color: Colors.themeblue,
@@ -65,7 +63,7 @@ const OverviewComponent = ({
             fontWeight: 'bold',
             justifyContent: 'center',
           }}>
-          {value} 
+          {value}
         </Text>
 
         <Image
@@ -88,12 +86,12 @@ const OverviewComponent = ({
           </Text>
         </View>
 
-        <MaterialCommunityIcons
+        {/* <MaterialCommunityIcons
           name="pencil"
           size={24}
           color={Colors.next}
           style={{marginLeft: 10}}
-        />
+        /> */}
       </TouchableOpacity>
     );
   };
@@ -128,10 +126,16 @@ const OverviewComponent = ({
 
       <View style={styles.jobActivityCard}>
         <View style={styles.activityValuesContainer}>
-          <ActivityRow label="Messages" value={jobActivity.communication_count} />
+          <ActivityRow
+            label="Messages"
+            value={jobActivity.communication_count}
+          />
           <ActivityRow label="Documents" value={jobActivity.documents_count} />
           <ActivityRow label="Photos" value={jobActivity.images_count} />
-          <ActivityRow label="Worksheets" value={jobActivity.worksheets_count} />
+          <ActivityRow
+            label="Worksheets"
+            value={jobActivity.worksheets_count}
+          />
         </View>
       </View>
 
@@ -142,11 +146,14 @@ const OverviewComponent = ({
       <View style={styles.jobActivityCard}>
         <View style={styles.activityValuesContainer}>
           <ContactRow label="Name:" value={generalInformation.name} />
-          <ContactRow label="Company Name:" value={generalInformation.company_name} />
+          {/* <ContactRow label="Company Name:" value={generalInformation.company_name} /> */}
           <ContactRow label="Address:" value={generalInformation.address} />
-          <ContactRow label="Phone:" value={generalInformation.contact_number} />
+          <ContactRow
+            label="Phone:"
+            value={generalInformation.contact_number}
+          />
           <ContactRow label="Email:" value={generalInformation.email} />
-          <ContactRow label="Lead Source:" value={generalInformation.lead_source} />
+          {/* <ContactRow label="Lead Source:" value={generalInformation.lead_source} /> */}
         </View>
       </View>
     </View>

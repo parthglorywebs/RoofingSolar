@@ -10,6 +10,7 @@ import {
   Modal,
   Image,
   Platform,
+  PermissionsAndroid,
 } from 'react-native';
 import Colors from '../../../assets/styling/colors';
 import moment from 'moment';
@@ -18,8 +19,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import FileViewer from 'react-native-file-viewer';
 import RNFS from 'react-native-fs';
 // import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions'; // If using runtime permissions
-import { Linking } from 'react-native'; // Import Linking
-
+import {Linking} from 'react-native'; // Import Linking
 
 const DocumentList = ({
   documents,
@@ -33,6 +33,8 @@ const DocumentList = ({
   const [modalLoading, setModalLoading] = useState(false);
   const [previewingDocumentId, setPreviewingDocumentId] = useState(null);
   const [imageModalVisible, setImageModalVisible] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
 
   // Helper function to get MIME type based on file extension
   const getMimeType = fileExtension => {
@@ -52,7 +54,7 @@ const DocumentList = ({
   };
 
   // Helper function to get the last segment after the final `/`
-  const extractFilename = (filePath) => {
+  const extractFilename = filePath => {
     const parts = filePath.split('/');
     return parts.pop();
   };
@@ -87,7 +89,7 @@ const DocumentList = ({
                 mimeType: mimeType, // Specify MIME type
               });
             } else {
-              await FileViewer.open(localFilePath, { showOpenWithDialog: true });
+              await FileViewer.open(localFilePath, {showOpenWithDialog: true});
             }
           } catch (fileViewerError) {
             console.error('FileViewer error:', fileViewerError);
@@ -112,7 +114,9 @@ const DocumentList = ({
                   mimeType: mimeType, // Specify MIME type
                 });
               } else {
-                await FileViewer.open(localFilePath, { showOpenWithDialog: true });
+                await FileViewer.open(localFilePath, {
+                  showOpenWithDialog: true,
+                });
               }
             } catch (fileViewerError) {
               console.error('FileViewer error:', fileViewerError);
@@ -140,47 +144,71 @@ const DocumentList = ({
     setPreviewingDocumentId(null);
   };
 
-  const handleDownload = async (document) => {
-  
-    const fileUrl = `${config.profileImage}storage/${document.file}`;
-    const fileName = document.name || 'unknown_file'; // Use document name, or provide a fallback
-    const fileExtension = document.type ? `.${document.type}` : '.pdf';  // Ensure file extension is set, or default to .pdf
-    const localFilePath = `${config.profileImage}storage/${document.file}`;  // Construct full file path
-  
-    // console.log("Downloading from:", fileUrl);
-    console.log("Saving to:", localFilePath);
-  
+  const handleDownload = async document => {
+    const fileUrl = `${config.s3BucketStorage}${document.file}`;
+    const fileName = document.name || 'downloaded_file';
+    const fileExtension = document.type ? `.${document.type}` : '.jpg';
+    const fullFileName = `${fileName}${fileExtension}`;
+
+    let downloadPath;
+
+    if (Platform.OS === 'android') {
+      const hasPermission = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+        {
+          title: 'Storage Permission Required',
+          message: 'App needs access to your storage to download files.',
+        },
+      );
+
+      if (hasPermission !== PermissionsAndroid.RESULTS.GRANTED) {
+        // Alert.alert('Permission Denied', 'Storage permission is required to download files.');
+        // return;
+      }
+
+      downloadPath = `${RNFS.DownloadDirectoryPath}/${fullFileName}`;
+    } else {
+      downloadPath = `${RNFS.DocumentDirectoryPath}/${fullFileName}`;
+    }
+
     try {
+      setIsDownloading(true); // Show modal
+      setDownloadProgress(0); // Reset progress
+
       const downloadResult = RNFS.downloadFile({
         fromUrl: fileUrl,
-        toFile: localFilePath,
-        begin: (res) => {
-          // console.log('download begin', res);
+        toFile: downloadPath,
+        begin: () => {
+          console.log('Download started...');
         },
-        progress: (res) => {
-          let percentage = (res.bytesWritten / res.contentLength) * 100;
-          // console.log(`Download progress: ${percentage.toFixed(2)}%`);
-        }
+        progress: res => {
+          const percentage = (res.bytesWritten / res.contentLength) * 100;
+          setDownloadProgress(percentage.toFixed(0));
+        },
       });
-  
-      const res = await downloadResult.promise; // Await the promise correctly
-  
+
+      const res = await downloadResult.promise;
+
+      setIsDownloading(false); // Hide modal after completion
+
       if (res.statusCode === 200) {
-        Alert.alert("Download Complete", `File saved to ${localFilePath}`);
-  
-        if (Platform.OS === 'android') {
-          Alert.alert("Download Complete", `File saved to ${localFilePath}. You may need to use a file explorer to view the file.`);
-        } else if (Platform.OS === 'ios') {
-          Linking.openURL(`${localFilePath}`)
-            .catch(err => Alert.alert("Error Opening File", err.message));
+        Alert.alert('Download Complete', `File saved to:\n${downloadPath}`);
+
+        if (Platform.OS === 'ios') {
+          Linking.openURL(`file://${downloadPath}`).catch(err =>
+            Alert.alert('Error Opening File', err.message),
+          );
         }
-  
       } else {
-        Alert.alert("Download Failed", `Server returned status code ${res.statusCode}`);
+        Alert.alert(
+          'Download Failed',
+          `Server returned status code ${res.statusCode}`,
+        );
       }
     } catch (error) {
-      console.warn("Download Error:", error);
-      Alert.alert("Download Error", error.message);
+      setIsDownloading(false);
+      console.warn('Download Error:', error);
+      Alert.alert('Download Error', error.message);
     }
   };
 
@@ -237,8 +265,7 @@ const DocumentList = ({
             <View style={styles.actions}>
               <TouchableOpacity
                 style={[styles.button, styles.downloadButton]}
-                onPress={() => handleDownload(document)}
-                >
+                onPress={() => handleDownload(document)}>
                 <MaterialCommunityIcons
                   name="download"
                   size={20}
@@ -307,6 +334,18 @@ const DocumentList = ({
           </View>
         </Modal>
       )}
+      <Modal
+        transparent={true}
+        visible={isDownloading}
+        animationType="fade"
+        onRequestClose={() => {}}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalText}>Downloading...</Text>
+            <Text style={styles.modalText}>{downloadProgress}%</Text>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -399,6 +438,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 5,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: 200,
+    padding: 20,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  modalText: {
+    fontSize: 18,
+    marginVertical: 5,
   },
 });
 

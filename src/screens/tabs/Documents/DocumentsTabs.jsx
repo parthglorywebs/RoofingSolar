@@ -220,10 +220,10 @@ function DocumentsTabs({selectedJob}) {
       );
 
       // Extract name from file path.
-      const fileName = filePreview.split('/').pop();
+      const fileName = filePreview.name;
       formData.append('document_file', {
-        uri: filePreview,
-        type: 'multipart/form-data',
+        uri: filePreview.uri,
+        type: filePreview.type,
         name: fileName,
       });
 
@@ -254,7 +254,7 @@ function DocumentsTabs({selectedJob}) {
         Alert.alert('Error', data.message || 'Failed to upload document.');
       }
     } catch (error) {
-      console.error('Error uploading document:', error);
+      console.error('Error uploading document:', error.response.data);
       setError('Error uploading document.');
       Alert.alert('Error', 'Error uploading document.');
     } finally {
@@ -267,7 +267,9 @@ function DocumentsTabs({selectedJob}) {
       const [res] = await DocumentPicker.pick({
         type: [types.pdf, types.docx, types.images],
       });
-      setFilePreview(res.uri);
+      console.log(res, 'res.uri');
+
+      setFilePreview(res);
     } catch (err) {
       if (!DocumentPicker.isCancel(err)) {
         console.error('DocumentPicker Error:', err);
@@ -511,16 +513,18 @@ function DocumentsTabs({selectedJob}) {
 
             {filePreview ? (
               <View style={styles.filePreviewContainer}>
-                {filePreview.match(/\.(jpg|jpeg|png|gif)$/i) ? (
+                {filePreview.uri.match(/\.(jpg|jpeg|png|gif)$/i) ? (
                   <Image
-                    source={{uri: filePreview}}
+                    source={{uri: filePreview.uri}}
                     style={styles.imagePreview}
                     resizeMode="contain"
                   />
                 ) : (
-                  <TouchableOpacity onPress={() => previewFile(filePreview)}>
+                  <TouchableOpacity
+                    onPress={() => previewFile(filePreview.uri)}>
                     <Text style={styles.fileTypeText}>
-                      Preview File: {filePreview.split('.').pop().toUpperCase()}
+                      Preview File:{' '}
+                      {filePreview.uri.split('.').pop().toUpperCase()}
                     </Text>
                   </TouchableOpacity>
                 )}

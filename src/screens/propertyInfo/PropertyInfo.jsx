@@ -27,6 +27,7 @@ import MessagesScreen from '../messages/MessageScreen';
 import DocumentsTabs from '../tabs/Documents/DocumentsTabs';
 import PhotosVideoScreen from '../photosvideos/PhotosVideoScreen';
 import WorksheetTabs from '../tabs/Worksheets/WorksheetTabs';
+import {getImageUrlByType} from '../../utils/common';
 
 const Tab = createMaterialTopTabNavigator();
 
@@ -90,12 +91,14 @@ const PropertyInfo = () => {
     try {
       setLoading(true);
       const {access_token, contractor_id} = await getLoginDetails();
+      const params = {
+        contractor_id: contractor_id,
+        project_id: initialSelectedJob.id,
+      };
+      console.log(params, 'params===>');
       const response = await axios.post(
         `${config.baseUrl}contractor/get-project-overview`,
-        {
-          contractor_id: contractor_id,
-          project_id: initialSelectedJob.id,
-        },
+        params,
         {
           headers: {
             Authorization: `Bearer ${access_token}`,
@@ -107,13 +110,16 @@ const PropertyInfo = () => {
       const data = response.data;
       if (data && data.data) {
         setJobActivity(data.data.job_activity);
+        const general_information = data.data.general_information;
+        console.log(general_information, 'general_information');
+
         setGeneralInformation({
-          name: data.data.general_information.name || '',
-          company_name: data.data.general_information.company_name || '---',
-          address: data.data.general_information.address || '',
-          contact_number: data.data.general_information.contact_number || '',
-          email: data.data.general_information.email || '',
-          lead_source: data.data.general_information.role || '',
+          name: general_information.customerName || '',
+          company_name: general_information.company_name || '---',
+          address: general_information.customerAddress || '',
+          contact_number: general_information.customerPhone || '',
+          email: general_information.customerEmail || '',
+          lead_source: general_information.role || '',
         });
         if (data.data.milestone && Array.isArray(data.data.milestone)) {
           setMilestoneData(data.data.milestone);
@@ -189,11 +195,20 @@ const PropertyInfo = () => {
 
       if (data && data.success && data.data && data.data.data) {
         // Set the cover photo from the response
+
+        const thumbUrl = getImageUrlByType(
+          data.data.data.project_image,
+          'thumbnail',
+        );
+        const gallery = getImageUrlByType(
+          data.data.data.project_image,
+          'gallery',
+        );
         setCoverPhoto({
           id: data.data.data.id,
           project_id: data.data.data.project_id,
-          project_image: data.data.data.project_image,
-          resizeimage: data.data.data.resizeimage,
+          project_image: gallery,
+          resizeimage: thumbUrl,
           compressimage: data.data.data.compressimage,
           date: data.data.data.date,
           time: data.data.data.time,
@@ -260,7 +275,7 @@ const PropertyInfo = () => {
           <ActivityIndicator size="large" color={Colors.primary} />
         ) : coverPhoto ? (
           <Image
-            source={{uri: `${config.baseStorage}${coverPhoto.resizeimage}`}}
+            source={{uri: `${coverPhoto.resizeimage}`}}
             style={styles.coverPhoto}
           />
         ) : null}

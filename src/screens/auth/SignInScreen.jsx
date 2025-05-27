@@ -9,7 +9,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Dimensions,
-  BackHandler
+  BackHandler,
 } from 'react-native';
 import {saveLoginDetails, getLoginDetails} from '../../utils/AsyncStorage';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -22,8 +22,8 @@ import {useColorScheme} from 'react-native'; // Import useColorScheme
 
 const {width} = Dimensions.get('window');
 const SignIn = ({navigation}) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('anil.test341@gmail.com');
+  const [password, setPassword] = useState('StjfpvFqS88LR8i');
   const [rememberMe, setRememberMe] = useState(false);
   const [secureTextEntry, setSecureTextEntry] = useState(true);
   const [webviewUrl, setWebviewUrl] = useState('');
@@ -47,7 +47,7 @@ const SignIn = ({navigation}) => {
       () => {
         // Return true to prevent default back navigation
         return true;
-      }
+      },
     );
 
     return () => backHandler.remove(); // Clean up on unmount
@@ -55,7 +55,11 @@ const SignIn = ({navigation}) => {
 
   useEffect(() => {
     const loadSavedCredentials = async () => {
-      const { email: rememberedEmail, password: rememberedPassword, rememberMe: savedRememberMe } = await getLoginDetails();
+      const {
+        email: rememberedEmail,
+        password: rememberedPassword,
+        rememberMe: savedRememberMe,
+      } = await getLoginDetails();
       if (savedRememberMe) {
         setEmail(rememberedEmail || '');
         setPassword(rememberedPassword || '');
@@ -98,13 +102,22 @@ const SignIn = ({navigation}) => {
 
     try {
       const response = await login(data).unwrap();
+      console.log(response, 'response');
+
       const {
         access_token,
         data: {id: contractor_id, name},
       } = response.data;
 
       setIsLoading(false);
-      saveLoginDetails(email, access_token, contractor_id, name, rememberMe, rememberMe ? password : '');
+      saveLoginDetails(
+        email,
+        access_token,
+        contractor_id,
+        name,
+        rememberMe,
+        rememberMe ? password : '',
+      );
       navigation.replace('BottomTabs');
 
       // console.log(access_token, contractor_id, name);
@@ -132,7 +145,6 @@ const SignIn = ({navigation}) => {
 
   const toggleSecureTextEntry = () => setSecureTextEntry(!secureTextEntry);
 
-
   const closeWebview = () => {
     setShowWebview(false);
     setWebviewUrl('');
@@ -141,8 +153,6 @@ const SignIn = ({navigation}) => {
   if (showWebview) {
     return <WebViewComponent url={webviewUrl} onClose={closeWebview} />;
   }
-
-
 
   const handleEmailChange = text => {
     if (text.length > 0) {
@@ -167,26 +177,28 @@ const SignIn = ({navigation}) => {
     const access_token = loginDetails ? loginDetails.access_token : '';
   };
 
-
   const handleForgotPassword = () => {
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-   const emailToPass = rememberMe && email && emailRegex.test(email) ? email : ''; // Conditional email
+    const emailToPass =
+      rememberMe && email && emailRegex.test(email) ? email : ''; // Conditional email
 
-    navigation.navigate('ForgotPassword', { rememberedEmail: emailToPass, rememberMe: rememberMe });
+    navigation.navigate('ForgotPassword', {
+      rememberedEmail: emailToPass,
+      rememberMe: rememberMe,
+    });
   };
 
-  
   return (
     <ScrollView
       contentContainerStyle={styles.container}
       style={styles.scrollView}>
-
       <Image
         source={require('../../assets/images/logo_login.png')}
         style={styles.logoIcon}
       />
-      <Text style={styles.header} 
-      // onPress={handleFill}
+      <Text
+        style={styles.header}
+        // onPress={handleFill}
       >
         Sign in to your Account
       </Text>
@@ -206,7 +218,7 @@ const SignIn = ({navigation}) => {
         keyboardType="email-address"
         value={email}
         onChangeText={handleEmailChange}
-        mode="outlined" 
+        mode="outlined"
         error={!!error.email}
         theme={{
           roundness: isFocused.email ? 15 : 11,
@@ -214,7 +226,7 @@ const SignIn = ({navigation}) => {
             primary: isFocused.email
               ? Colors.noneFocusTextinput
               : Colors.primary,
-            text: (isDarkMode || email) ? Colors.black : Colors.primary,  // Apply always light color
+            text: isDarkMode || email ? Colors.black : Colors.primary, // Apply always light color
             placeholder: Colors.themePlaceHolder,
             error: Colors.red,
             fontSize: 18,
@@ -228,7 +240,7 @@ const SignIn = ({navigation}) => {
 
       {error.email ? <Text style={styles.errorText}>{error.email}</Text> : null}
 
-      <View style={{flexDirection: 'row', position: 'relative' }}>
+      <View style={{flexDirection: 'row', position: 'relative'}}>
         <PaperTextInput
           style={[
             styles.input,
@@ -248,7 +260,7 @@ const SignIn = ({navigation}) => {
               primary: isFocused.password
                 ? Colors.noneFocusTextinput
                 : Colors.primary,
-              text: (isDarkMode || password) ? Colors.primary : Colors.primary,  // Always apply light color
+              text: isDarkMode || password ? Colors.primary : Colors.primary, // Always apply light color
               placeholder: Colors.themeDotted,
               error: Colors.red,
               fontSize: 18,
@@ -302,15 +314,11 @@ const SignIn = ({navigation}) => {
         )}
       </TouchableOpacity>
 
-
       <View style={styles.footer}>
         <TouchableOpacity onPress={handleForgotPassword}>
           <Text style={styles.forgotPasswordText}>Forgot Password ?</Text>
         </TouchableOpacity>
-
       </View>
-
-
     </ScrollView>
   );
 };

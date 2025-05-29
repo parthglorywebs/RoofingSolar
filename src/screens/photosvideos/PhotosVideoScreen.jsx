@@ -32,6 +32,7 @@ import FastImage from 'react-native-fast-image';
 import BackgroundService from 'react-native-background-actions';
 // import notifee, {AndroidImportance} from '@notifee/react-native';
 import {getImageUrlByType} from '../../utils/common';
+import ImageSelector from '../../components/ImagePicker/ImageSelector';
 
 const {width, height} = Dimensions.get('window');
 
@@ -527,8 +528,8 @@ const PhotosVideoScreen = ({selectedJob}) => {
     }
   };
 
-  const processAndUpload = async () => {
-    const files = await pickImage();
+  const processAndUpload = async files => {
+    // const files = await pickImage();
     if (!files) return;
 
     setUploadingStatus({
@@ -1417,12 +1418,18 @@ const PhotosVideoScreen = ({selectedJob}) => {
             style={{marginRight: 10}}
           />
         )}
-        <TouchableOpacity
+
+        <ImageSelector onImagesSelected={uris => processAndUpload(uris)}>
+          <View style={[styles.addButton, {opacity: uploading ? 0.5 : 1}]}>
+            <MaterialCommunityIcons name="image-plus" size={20} color="white" />
+          </View>
+        </ImageSelector>
+        {/* <TouchableOpacity
           style={[styles.addButton, {opacity: uploading ? 0.5 : 1}]}
           onPress={processAndUpload}
           disabled={uploading}>
           <MaterialCommunityIcons name="image-plus" size={20} color="white" />
-        </TouchableOpacity>
+        </TouchableOpacity> */}
         <TouchableOpacity
           style={styles.filterButton}
           onPress={handleFilterToggle}>

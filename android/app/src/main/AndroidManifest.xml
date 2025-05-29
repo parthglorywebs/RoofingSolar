@@ -57,6 +57,8 @@
         tools:ignore="GoogleAppIndexingWarning"
         android:networkSecurityConfig="@xml/react_native_config"
         android:installLocation="auto">
+        <activity android:name="com.ahmedadeltito.photoeditor.PhotoEditorActivity" /> 
+        <activity android:name="com.yalantis.ucrop.UCropActivity" />
         <service
             android:name="com.transistorsoft.rnbackgroundfetch.HeadlessTask"
             android:enabled="true"

@@ -19,6 +19,15 @@ import {getLoginDetails} from '../../utils/AsyncStorage';
 import axios from 'axios';
 import config from '../../config/config';
 
+const pipelineColorMap = {
+  lead: '#E8EFFB',
+  prospect: '#FCF5E5',
+  approve: '#DCF6E9',
+  completed: '#E5F6FB',
+  invoice: '#EDE7FB',
+  closed: '#F9F1F0',
+};
+
 const {width} = Dimensions.get('window'); // Get the screen width
 
 const DashboardScreen = () => {
@@ -55,8 +64,13 @@ const DashboardScreen = () => {
       );
 
       const data = response.data;
+      const enhancedPipelineData = (data.data.milestone || []).map(item => ({
+        ...item,
+        backgroundColor: pipelineColorMap[item.currentStage] || '#FFFFFF', // default to white if not matched
+      }));
+      console.log(data.data.milestone, 'data.data.milestone');
 
-      setPipelineData(data.data.milestone || []);
+      setPipelineData(enhancedPipelineData || []);
       setProjectCount(data.data.projectcount || 0);
       setActivityData(data.data.activity);
       setLoading(false);
@@ -147,7 +161,8 @@ const DashboardScreen = () => {
 
     return (
       <TouchableOpacity onPress={() => handleRowPress(item)}>
-        <View style={styles.gridItem}>
+        <View
+          style={[styles.gridItem, {backgroundColor: item.backgroundColor}]}>
           <View style={styles.textContainer}>
             <Text style={styles.gridText}>{item.pipeline || '0'}</Text>
             <Text style={styles.subText}>
@@ -179,18 +194,39 @@ const DashboardScreen = () => {
     }
     const activity = activityData || {};
     const activityItems = [
-      {label: 'New Leads', value: activity.jobs_leads || 0},
-      {label: 'Jobs Approved', value: activity.jobs_approved || 0},
-      {label: 'Jobs Completed', value: activity.jobs_completed || 0},
+      {
+        label: 'New Leads',
+        value: activity.jobs_leads || 0,
+        currentStage: 'lead',
+      },
+      {
+        label: 'Jobs Approved',
+        value: activity.jobs_approved || 0,
+        currentStage: 'approve',
+      },
+      {
+        label: 'Jobs Completed',
+        value: activity.jobs_completed || 0,
+        currentStage: 'completed',
+      },
       {
         label: 'Money Collected',
         value: `${Number(activity.jobs_money_collected || 0).toLocaleString(
           'en-US',
           {style: 'currency', currency: 'USD'},
         )}`,
+        currentStage: 'invoice',
       },
-      {label: 'Jobs Invoiced', value: activity.jobs_invoiced || 0},
-      {label: 'Jobs Closed', value: activity.jobs_closed || 0},
+      {
+        label: 'Jobs Invoiced',
+        value: activity.jobs_invoiced || 0,
+        currentStage: 'invoice',
+      },
+      {
+        label: 'Jobs Closed',
+        value: activity.jobs_closed || 0,
+        currentStage: 'closed',
+      },
     ];
 
     return activityItems.map((item, index) => (
@@ -198,7 +234,13 @@ const DashboardScreen = () => {
         <TouchableOpacity
           style={styles.activityValueRow}
           onPress={() => {
-            // handleLeads(item)
+            const itemD = {
+              currentStage: item.currentStage,
+              pipeline: 19,
+              total: item.value,
+              backgroundColor: pipelineColorMap[item.currentStage] || '#FFFFFF',
+            };
+            handleRowPress(itemD);
           }}>
           <Text style={styles.activityLabel}>{item.label}</Text>
           <Text
@@ -274,6 +316,8 @@ const DashboardScreen = () => {
   };
 
   const handleRowPress = item => {
+    console.log(item, 'item');
+
     // console.log('Navigating with item.currentStage:', item.currentStage);
     navigation.navigate('Leads', {
       screen: 'LeadsInner',

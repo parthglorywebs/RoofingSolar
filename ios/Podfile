@@ -24,6 +24,9 @@ target 'RoofingSolar' do
   )
 
   pod 'RNVectorIcons', :path => '../node_modules/react-native-vector-icons'
+  pod 'SDWebImage', :modular_headers => true
+  pod 'SDWebImageWebPCoder', :modular_headers => true
+
 
   target 'RoofingSolarTests' do
     inherit! :complete

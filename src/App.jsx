@@ -18,8 +18,17 @@ import StackNavigator from './navigation/StackNavigation';
 import Colors from './assets/styling/colors';
 import DrawerNavigator from './navigation/DrawerNavigator';
 import SignIn from './screens/auth/SignInScreen';
+import PushNotification from 'react-native-push-notification';
 
 const Stack = createStackNavigator();
+
+PushNotification.configure({
+  onNotification: function (notification) {
+    console.log('Notification:', notification);
+  },
+  popInitialNotification: true,
+  requestPermissions: Platform.OS === 'ios',
+});
 
 const App = () => {
   const isDarkMode = useColorScheme() === 'dark';
@@ -47,8 +56,6 @@ const App = () => {
       fetchContractorProfile(); // Fetch the profile if authenticated
     }
   }, [isAuthenticated, fetchContractorProfile]);
-
-  
 
   const fetchContractorProfile = useCallback(async () => {
     setLoading(true);
@@ -103,7 +110,6 @@ const App = () => {
                 name="SignIn"
                 component={StackNavigator}
                 options={{headerShown: false, headerLeft: null}}
-                
               />
               <Stack.Screen
                 name="BottomTabs"

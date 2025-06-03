@@ -111,7 +111,6 @@ const PropertyInfo = () => {
       if (data && data.data) {
         setJobActivity(data.data.job_activity);
         const general_information = data.data.general_information;
-        console.log(general_information, 'general_information');
 
         setGeneralInformation({
           name: general_information.customerName || '',

@@ -20,17 +20,42 @@ import {
 import {useColorScheme} from 'react-native';
 import Colors from '../../assets/styling/colors';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import {Chip, TextInput as PaperTextInput, Searchbar} from 'react-native-paper';
+import {
+  Card,
+  Chip,
+  IconButton,
+  TextInput as PaperTextInput,
+  Searchbar,
+} from 'react-native-paper';
 import axios from 'axios';
 import config from '../../config/config';
 import {getLoginDetails} from '../../utils/AsyncStorage';
 import {useNavigation} from '@react-navigation/native';
 import countries from '../../assets/countries.json';
 import * as Progress from 'react-native-progress';
+import ActionSheet from 'react-native-actions-sheet';
+import FilterActionSheet from '../../components/FilterActionSheet';
+import LoadListing from './component/LoadListing';
 
 const {height: screenHeight} = Dimensions.get('window');
+const pipelineColorMap = {
+  lead: '#E8EFFB',
+  prospect: '#FCF5E5',
+  approve: '#DCF6E9',
+  completed: '#E5F6FB',
+  invoice: '#EDE7FB',
+  closed: '#F9F1F0',
+};
 
 const propertyData = [];
+
+const FloatingPlusButton = ({onPress}) => {
+  return (
+    <TouchableOpacity style={styles.floatingButton} onPress={onPress}>
+      <MaterialCommunityIcons name="plus" size={28} color="white" />
+    </TouchableOpacity>
+  );
+};
 
 // New Component to show chips for selected filters
 const FilterChip = ({stage, onClose}) => {
@@ -49,6 +74,7 @@ const FilterChip = ({stage, onClose}) => {
 const LeadScreen = ({route}) => {
   const itemData = route?.params?.itemData;
   const navigation = useNavigation();
+  const sheetRef = useRef();
   const [pagination, setPagination] = useState({
     current_page: 0,
     last_page: 10,
@@ -70,6 +96,8 @@ const LeadScreen = ({route}) => {
   const [loading, setLoading] = useState(false);
   const [errorList, setErrorList] = useState(null);
   const [searchText, setSearchText] = useState(''); // State to manage search input
+  const [showSearch, setShowSearch] = useState(false);
+
   const [stageInfo, setStageInfo] = useState(null);
   //New State variables
   const [isFilterModalVisible, setFilterModalVisible] = useState(false);
@@ -79,6 +107,7 @@ const LeadScreen = ({route}) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
+  console.log(stageInfo?.backgroundColor, isDarkMode, 'stageInfo');
 
   const isDarkMode = useColorScheme() === 'dark';
   const backgroundStyle = {
@@ -261,7 +290,8 @@ const LeadScreen = ({route}) => {
   }, []);
 
   const openFilterModal = () => {
-    setFilterModalVisible(true);
+    sheetRef.current?.show();
+    // setFilterModalVisible(true);
   };
 
   const closeFilterModal = () => {
@@ -560,7 +590,7 @@ const LeadScreen = ({route}) => {
               // openModal(project)
               handlePropertyDetail(project)
             }>
-            <View style={styles.rowContainer}>
+            <View style={[styles.rowContainer, {backgroundColor: '#FFF'}]}>
               <View
                 style={[
                   styles.circle,
@@ -604,7 +634,7 @@ const LeadScreen = ({route}) => {
                     color: project.address ? Colors.primary : Colors.red,
                   },
                 ].map((item, idx) => (
-                  <View key={idx} style={styles.activityValueRow}>
+                  <View key={idx} style={[styles.activityValueRow]}>
                     {item.icon && (
                       <MaterialCommunityIcons
                         name={item.icon}
@@ -791,11 +821,29 @@ const LeadScreen = ({route}) => {
         style={{
           flexDirection: 'column',
           marginBottom: 10,
-          // backgroundColor: Colors.light,
+          backgroundColor: selectedFilterStage
+            ? pipelineColorMap[selectedFilterStage]
+            : '#F8FAFB',
         }}>
         <View style={styles.resultRow}>
           <Text style={styles.resultText}>Result ({pagination.total})</Text>
-          <View style={styles.buttonContainer}>
+          <View style={[styles.buttonContainer, {justifyContent: 'flex-end'}]}>
+            {selectedFilterStage && (
+              <FilterChip
+                stage={selectedFilterStage}
+                onClose={() => handleResetFilter()}
+              />
+            )}
+            {/* {selectedFilterStage && (
+              <View style={{display: 'flex', alignItems: 'center'}}>
+                <Chip
+                  textStyle={{color: 'white'}}
+                  style={styles.filterChip}
+                  onClose={() => {}}>
+                  {selectedFilterStage}
+                </Chip>
+              </View>
+            )} */}
             <TouchableOpacity
               style={[styles.filterButton, {backgroundColor: Colors.white}]}
               onPress={openFilterModal}>
@@ -805,19 +853,13 @@ const LeadScreen = ({route}) => {
                 color={Colors.primary}
               />
             </TouchableOpacity>
-            <TouchableOpacity
+            {/* <TouchableOpacity
               style={styles.advancebutton}
               onPress={openModalAdvance}>
               <Text style={styles.advancetext}>+</Text>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
           </View>
         </View>
-        {selectedFilterStage && (
-          <FilterChip
-            stage={selectedFilterStage}
-            onClose={() => handleResetFilter()}
-          />
-        )}
 
         <FlatList
           data={propertyData}
@@ -847,7 +889,7 @@ const LeadScreen = ({route}) => {
         ) : projectListData.length === 0 ? (
           renderEmptyState()
         ) : (
-          renderProjectList
+          <LoadListing data={filteredProjects} itemData={itemData} />
         )}
         {/*  Removed `!loading && !isFetchingMore`  and put condition inside main content */}
         <Modal
@@ -1183,6 +1225,7 @@ const LeadScreen = ({route}) => {
     currentPage,
     renderEmptyState,
     getCircleColors,
+    stageInfo?.currentStage,
   ]);
 
   return (
@@ -1199,6 +1242,17 @@ const LeadScreen = ({route}) => {
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
+      />
+
+      <FloatingPlusButton onPress={openModalAdvance} />
+      <FilterActionSheet
+        ref={sheetRef}
+        onSelect={stage => {
+          handleStageSelect(stage);
+        }}
+        onReset={() => {
+          handleStageSelect(null);
+        }}
       />
     </SafeAreaView>
   );
@@ -1226,7 +1280,7 @@ const styles = StyleSheet.create({
   filterChipContainer: {
     paddingHorizontal: 20,
     paddingTop: 5,
-    width: '50%',
+    // width: '50%',
   },
   filterChip: {
     backgroundColor: Colors.filter,
@@ -1497,11 +1551,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     // paddingHorizontal: 10,
     marginTop: 20,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    // elevation: 5,
+    // shadowColor: '#000',
+    // shadowOffset: {width: 0, height: 2},
+    // shadowOpacity: 0.1,
+    // shadowRadius: 4,
     flexDirection: 'column',
   },
   jobActivityTitle: {
@@ -1583,6 +1637,22 @@ const styles = StyleSheet.create({
   loadingMoreContainer: {
     paddingVertical: 20,
     alignItems: 'center',
+  },
+  floatingButton: {
+    position: 'absolute',
+    bottom: 20, // Adjust based on tab height
+    right: 20,
+    backgroundColor: '#2196F3', // or your theme's blue
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 6, // for Android shadow
+    shadowColor: '#000', // for iOS shadow
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
 });
 

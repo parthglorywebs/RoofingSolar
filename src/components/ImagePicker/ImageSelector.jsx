@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useRef} from 'react';
 import {
   View,
   Text,
@@ -6,16 +6,43 @@ import {
   StyleSheet,
   TouchableOpacity,
   Platform,
+  PermissionsAndroid,
 } from 'react-native';
 import {launchCamera, launchImageLibrary} from 'react-native-image-picker';
+import MultiCaptureCamera from './MultiCaptureCamera';
 
 const ImageSelector = ({onImagesSelected, children}) => {
+  const cameraComponentRef = useRef();
+
   const handleSelectSource = () => {
     Alert.alert('Choose source', 'Select images from:', [
       {text: 'Camera', onPress: () => pickImages('camera')},
       {text: 'Gallery', onPress: () => pickImages('gallery')},
       {text: 'Cancel', style: 'cancel'},
     ]);
+  };
+
+  const requestCameraPermission = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.CAMERA,
+          {
+            title: 'Camera Permission',
+            message: 'This app needs access to your camera.',
+            buttonNeutral: 'Ask Me Later',
+            buttonNegative: 'Cancel',
+            buttonPositive: 'OK',
+          },
+        );
+        return granted === PermissionsAndroid.RESULTS.GRANTED;
+      } catch (err) {
+        console.warn(err);
+        return false;
+      }
+    } else {
+      return true;
+    }
   };
 
   const pickImages = async source => {
@@ -26,6 +53,15 @@ const ImageSelector = ({onImagesSelected, children}) => {
         saveToPhotos: true,
         selectionLimit: 0, // 0 = unlimited
       };
+      if (source === 'camera') {
+        const hasPermission = await requestCameraPermission();
+        if (!hasPermission) {
+          Alert.alert('Camera permission denied');
+          return false;
+        }
+        handleOpenCamera();
+        return true;
+      }
 
       const response =
         source === 'camera'
@@ -55,11 +91,20 @@ const ImageSelector = ({onImagesSelected, children}) => {
     }
   };
 
+  const handleOpenCamera = () => {
+    cameraComponentRef.current?.openCamera();
+  };
+
   return (
     <View style={styles.container}>
       <TouchableOpacity onPress={handleSelectSource}>
         {children ?? <Text style={styles.buttonText}>Select Images</Text>}
       </TouchableOpacity>
+      <MultiCaptureCamera
+        ref={cameraComponentRef}
+        maxPhoto={30}
+        onCaptureDone={onImagesSelected}
+      />
     </View>
   );
 };

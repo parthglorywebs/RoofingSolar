@@ -34,6 +34,7 @@ const LoadCard = ({item, onPress}) => {
               }}
             />
           )}
+          titleStyle={{color: '#000', fontWeight: 'bold'}}
           right={() => (
             <MaterialCommunityIcons
               name="chevron-right"
@@ -149,6 +150,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e0e0e0',
     borderRadius: 8,
+    backgroundColor: '#FFF',
   },
   row: {
     flexDirection: 'row',

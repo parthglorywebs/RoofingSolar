@@ -84,7 +84,7 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
-        vectorDrawables.useSupportLibrary = true 
+        vectorDrawables.useSupportLibrary = true
         
     }
     signingConfigs {
@@ -123,7 +123,7 @@ android {
         }
     }
 }
-apply from: file("../../node_modules/react-native-vector-icons/fonts.gradle") 
+apply from: file("../../node_modules/react-native-vector-icons/fonts.gradle")
 
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin

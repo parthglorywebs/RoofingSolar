@@ -68,7 +68,6 @@ const DashboardScreen = () => {
         ...item,
         backgroundColor: pipelineColorMap[item.currentStage] || '#FFFFFF', // default to white if not matched
       }));
-      console.log(data.data.milestone, 'data.data.milestone');
 
       setPipelineData(enhancedPipelineData || []);
       setProjectCount(data.data.projectcount || 0);

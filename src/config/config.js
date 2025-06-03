@@ -8,10 +8,10 @@ const config = {
   baseStorage: 'http://13.56.14.87/storage',
   s3BucketStorage: 'https://roofing-stg.s3.amazonaws.com/',
 
-  // baseUrl: process.env.REACT_APP_BASE_URL || 'http://192.168.3.22:8000/api/',
-  // webUrl: 'http://192.168.3.22:8000/',
-  // profileImage: 'http://192.168.3.22:8000/',
-  // baseStorage: 'http://192.168.3.22:8000/storage',
+  // baseUrl: process.env.REACT_APP_BASE_URL || 'http://192.168.3.16:8000/api/',
+  // webUrl: 'http://192.168.3.16:8000/',
+  // profileImage: 'http://192.168.3.16:8000/',
+  // baseStorage: 'http://192.168.3.16:8000/storage',
   // s3BucketStorage: 'https://roofing-stg.s3.amazonaws.com/',
 };
 

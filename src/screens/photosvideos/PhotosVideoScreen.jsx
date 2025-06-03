@@ -30,11 +30,15 @@ import {Calendar} from 'react-native-calendars';
 import ImageViewer from 'react-native-image-zoom-viewer';
 import FastImage from 'react-native-fast-image';
 import BackgroundService from 'react-native-background-actions';
+import {createThumbnail} from 'react-native-create-thumbnail';
+import PushNotification from 'react-native-push-notification';
 // import notifee, {AndroidImportance} from '@notifee/react-native';
 import {getImageUrlByType} from '../../utils/common';
 import ImageSelector from '../../components/ImagePicker/ImageSelector';
+import MediaGallery from './MediaGallery';
 
 const {width, height} = Dimensions.get('window');
+const NOTIFICATION_ID = 999;
 
 const PhotosVideoScreen = ({selectedJob}) => {
   const [groupedMedia, setGroupedMedia] = useState({});
@@ -46,7 +50,6 @@ const PhotosVideoScreen = ({selectedJob}) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [apiLoading, setApiLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [projectId, setProjectId] = useState(null);
   const flatListRef = useRef(null);
@@ -71,10 +74,11 @@ const PhotosVideoScreen = ({selectedJob}) => {
   const [isUploading, setIsUploading] = useState(false);
   const [currentUploadFileName, setCurrentUploadFileName] = useState('');
 
-  // Pagination states
+  const [videoImageListing, setVideoImageListing] = useState([]);
   const [page, setPage] = useState(1); // Current page number
   const [totalPages, setTotalPages] = useState(1); // Total number of pages
   const [isFetchingMore, setIsFetchingMore] = useState(false); // Loading state for pagination
+  const [apiLoading, setApiLoading] = useState(true);
   const [initialLoad, setInitialLoad] = useState(true); // Track the initial data fetch
   const [uploadingStatus, setUploadingStatus] = useState({
     processing: 0,
@@ -90,156 +94,332 @@ const PhotosVideoScreen = ({selectedJob}) => {
   const fetchInitialData = useCallback(async () => {
     const {contractor_id} = await getLoginDetails();
     setContractorId(contractor_id);
-    await fetchPhotoVideos(1); // Fetch initial data with page 1
+    await onRefresh(1); // Fetch initial data with page 1
     setInitialLoad(false); // Initial load is complete
   }, []);
 
-  const fetchPhotoVideos = useCallback(
+  const getMediaList = async rawItems => {
+    const mediaList = await Promise.all(
+      rawItems.flatMap(({is_date, is_item}) =>
+        is_item.map(async item => {
+          if (item.media_type === 'video') {
+            const thumb_video_image = await getImageUrlByType(
+              item.project_image,
+              'thumb_video_image',
+            );
+            const videoUrl = await getImageUrlByType(
+              item.project_image,
+              'video',
+            );
+
+            return {
+              ...item,
+              is_date,
+              url: videoUrl,
+              galleryUrl: thumb_video_image,
+              type: item.media_type,
+              notes: item.notes,
+              createdAt: item.created_at,
+              username: item.created_by,
+            };
+          } else {
+            const thumbUrl = await getImageUrlByType(
+              item.project_image,
+              'thumbnail',
+            );
+            const galleryUrl = await getImageUrlByType(
+              item.project_image,
+              'gallery',
+            );
+
+            return {
+              ...item,
+              is_date,
+              url: thumbUrl,
+              galleryUrl: galleryUrl,
+              type: item.media_type,
+              notes: item.notes,
+              createdAt: item.created_at,
+              username: item.created_by,
+            };
+          }
+        }),
+      ),
+    );
+
+    return mediaList;
+  };
+
+  const onRefresh = useCallback(
     async (currentPage = 1, fromDate = null, toDate = null) => {
-      // Added currentPage parameter with default value
       if (currentPage === 1) {
-        setApiLoading(true); // Only show full loader on initial load
+        setApiLoading(true); // Initial load
       } else {
-        setIsFetchingMore(true); // Show pagination loader
+        setIsFetchingMore(true); // Pagination loader
       }
 
+      const {access_token, contractor_id} = await getLoginDetails();
       try {
-        const {access_token, contractor_id} = await getLoginDetails();
         let apiUrl = `${config.baseUrl}contractor/get-photos-videos`;
         let postData = {
           contractor_id: contractor_id,
           project_id: selectedJob.id,
-          page: currentPage, // Use the currentPage parameter
+          page: currentPage,
         };
-
-        if (fromDate && toDate) {
-          apiUrl = `${config.baseUrl}contractor/date-filter-photos-videos`;
-          postData = {
-            contractor_id: contractor_id,
-            project_id: selectedJob.id,
-            fromdate: moment(fromDate).format('MM/DD/YYYY'),
-            todate: moment(toDate).format('MM/DD/YYYY'),
-            page: currentPage, // Include page for date-filtered requests as well
-          };
-        }
 
         const response = await axios.post(apiUrl, postData, {
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
             Authorization: `Bearer ${access_token}`,
           },
-          transformResponse: data => {
-            try {
-              return JSON.parse(data);
-            } catch (e) {
-              return data;
-            }
-          },
         });
 
-        if (response.status !== 200) {
-          // Check for 422 status specifically
-          if (response.status === 422) {
-            setGroupedMedia({}); // Clear any existing data
-            console.log(
-              'No Photos and videos found for the selected date range',
+        const sources = response.data;
+        const rawItems = sources?.data?.data?.data ?? [];
+
+        const formattedItems = rawItems.map(item => {
+          const is_date = item.created_at;
+
+          if (item.media_type === 'video') {
+            const thumb_video_image = getImageUrlByType(
+              item.project_image,
+              'thumb_video_image',
             );
-            // Optionally, show a user-friendly message (not an Alert, just a text in the UI)
-            return; // Exit the function early
-          } else {
-            throw new Error('Request failed with status ' + response.status); //Handle other errors
+            const videoUrl = getImageUrlByType(item.project_image, 'video');
+            return {
+              ...item,
+              is_date,
+              url: videoUrl,
+              galleryUrl: thumb_video_image,
+              type: item.media_type,
+              notes: item.notes,
+              createdAt: item.created_at,
+              username: item.created_by,
+            };
           }
-        }
 
-        const data = response.data;
+          const thumbnail = getImageUrlByType(item.project_image, 'thumbnail');
+          const galleryUrl = getImageUrlByType(item.project_image, 'gallery');
+          const original = getImageUrlByType(item.project_image, 'original');
 
-        if (
-          data &&
-          data.success === false &&
-          data.message === 'Photos & Videos not found.'
-        ) {
-          setGroupedMedia({});
-          // console.log('No Photos and videos found');
-        } else if (data && data.data) {
-          const grouped = data.data.data.reduce((acc, dayData) => {
-            const dayItems = dayData.is_item
-              .map(item => {
-                const thumbUrl = getImageUrlByType(
-                  item.project_image,
-                  'thumbnail',
-                );
-                const galleryUrl = getImageUrlByType(
-                  item.project_image,
-                  'gallery',
-                );
-
-                if (!thumbUrl || !galleryUrl) return null;
-
-                return {
-                  uri: thumbUrl,
-                  galleryUrl: galleryUrl,
-                  type: item.media_type,
-                  notes: item.notes,
-                  postedTime: item.created_at,
-                  date: dayData.is_date,
-                  mediaId: item.id,
-                  created_by: item.created_by,
-                };
-              })
-              .filter(Boolean); // Removes any null items
-
-            if (dayItems.length > 0) {
-              if (!acc[dayData.is_date]) {
-                acc[dayData.is_date] = [];
-              }
-              acc[dayData.is_date].push(...dayItems);
-            }
-
-            return acc;
-          }, {});
-
+          return {
+            ...item,
+            is_date,
+            url: galleryUrl,
+            thumbnail: thumbnail,
+            original: original,
+            type: item.media_type,
+            notes: item.notes,
+            createdAt: item.created_at,
+            username: item.created_by,
+          };
+        });
+        if (formattedItems?.length > 0) {
           if (currentPage === 1) {
-            // Initial data load, replace existing data
-            setGroupedMedia(grouped);
+            setVideoImageListing(formattedItems);
           } else {
-            // Append new data to existing data
-            setGroupedMedia(prevGroupedMedia => {
-              const newGroupedMedia = {...prevGroupedMedia};
-              for (const date in grouped) {
-                if (newGroupedMedia[date]) {
-                  // If date already exists, append the items
-                  newGroupedMedia[date] = [
-                    ...newGroupedMedia[date],
-                    ...grouped[date],
-                  ];
-                } else {
-                  // If date doesn't exist, add the new date and items
-                  newGroupedMedia[date] = grouped[date];
-                }
-              }
-              return newGroupedMedia;
-            });
+            setVideoImageListing(prev => [...prev, ...formattedItems]); // Append new items
           }
-
-          setTotalPages(data.data.last_page); // Set total pages from response
-          setPage(currentPage); // Update current page state
         } else {
-          console.error('Invalid data format received from API:', data);
-          Alert.alert(
-            'Error',
-            'Failed to load media files. Invalid data format.',
-          );
+          setVideoImageListing([]);
         }
+
+        setTotalPages(sources.data.last_page);
+        setPage(currentPage);
       } catch (error) {
-        console.error('Error fetching photos/videos:', error);
-        // Alert.alert('Error', 'Failed to load photos and videos.');
+        console.error('Error loading media:', error);
       } finally {
         setApiLoading(false);
-        setIsFetchingMore(false); // End pagination loading
+        setIsFetchingMore(false);
       }
     },
     [selectedJob],
   );
+
+  const requestPermission = async () => {
+    if (Platform.OS === 'android') {
+      const permissions = [
+        PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+        PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION,
+      ];
+
+      const granted = await PermissionsAndroid.requestMultiple(permissions);
+      console.log(granted);
+
+      return Object.values(granted).every(
+        status => status === PermissionsAndroid.RESULTS.GRANTED,
+      );
+    }
+    return true;
+  };
+
+  // const fetchPhotoVideos = useCallback(
+  //   async (currentPage = 1, fromDate = null, toDate = null) => {
+  //     // Added currentPage parameter with default value
+  //     if (currentPage === 1) {
+  //       setApiLoading(true); // Only show full loader on initial load
+  //     } else {
+  //       setIsFetchingMore(true); // Show pagination loader
+  //     }
+
+  //     try {
+  //       const {access_token, contractor_id} = await getLoginDetails();
+  //       let apiUrl = `${config.baseUrl}contractor/get-photos-videos`;
+  //       let postData = {
+  //         contractor_id: contractor_id,
+  //         project_id: selectedJob.id,
+  //         page: currentPage, // Use the currentPage parameter
+  //       };
+
+  //       // if (fromDate && toDate) {
+  //       //   apiUrl = `${config.baseUrl}contractor/date-filter-photos-videos`;
+  //       //   postData = {
+  //       //     contractor_id: contractor_id,
+  //       //     project_id: selectedJob.id,
+  //       //     fromdate: moment(fromDate).format('MM/DD/YYYY'),
+  //       //     todate: moment(toDate).format('MM/DD/YYYY'),
+  //       //     page: currentPage, // Include page for date-filtered requests as well
+  //       //   };
+  //       // }
+
+  //       const response = await axios.post(apiUrl, postData, {
+  //         headers: {
+  //           'Content-Type': 'application/x-www-form-urlencoded',
+  //           Authorization: `Bearer ${access_token}`,
+  //         },
+  //         transformResponse: data => {
+  //           try {
+  //             return JSON.parse(data);
+  //           } catch (e) {
+  //             return data;
+  //           }
+  //         },
+  //       });
+
+  //       if (response.status !== 200) {
+  //         // Check for 422 status specifically
+  //         if (response.status === 422) {
+  //           setGroupedMedia({}); // Clear any existing data
+  //           console.log(
+  //             'No Photos and videos found for the selected date range',
+  //           );
+  //           // Optionally, show a user-friendly message (not an Alert, just a text in the UI)
+  //           return; // Exit the function early
+  //         } else {
+  //           throw new Error('Request failed with status ' + response.status); //Handle other errors
+  //         }
+  //       }
+
+  //       const data = response.data;
+  //       const rawItems = data?.data?.data ?? [];
+  //       const mediaList = await getMediaList(rawItems);
+
+  //       const allRecords = (data?.data?.data ?? []).flatMap(a => a.is_item);
+  //       const medial = mediaList;
+  //       console.log(allRecords, medial.length, 'mediaList');
+
+  //       setVideoImageListing(mediaList);
+  //       setTotalPages(data.data.last_page); // Set total pages from response
+  //       if (currentPage === 1) {
+  //         setPage(currentPage); // Update current page state
+  //       }
+
+  //       // const itemData = (data?.data?.data ?? []).map(item => {
+  //       //   return {
+  //       //     id: '4',
+  //       //     url: 'https://samplelib.com/lib/preview/mp4/sample-5s.mp4',
+  //       //     type: 'video',
+  //       //     createdAt: '2025-05-29T11:15:00Z',
+  //       //   };
+  //       // });
+
+  //       // if (
+  //       //   data &&
+  //       //   data.success === false &&
+  //       //   data.message === 'Photos & Videos not found.'
+  //       // ) {
+  //       //   setGroupedMedia({});
+  //       //   // console.log('No Photos and videos found');
+  //       // } else if (data && data.data) {
+  //       //   const grouped = data.data.data.reduce((acc, dayData) => {
+  //       //     const dayItems = dayData.is_item
+  //       //       .map(item => {
+  //       //         const thumbUrl = getImageUrlByType(
+  //       //           item.project_image,
+  //       //           'thumbnail',
+  //       //         );
+  //       //         const galleryUrl = getImageUrlByType(
+  //       //           item.project_image,
+  //       //           'gallery',
+  //       //         );
+
+  //       //         if (!thumbUrl || !galleryUrl) return null;
+
+  //       //         return {
+  //       //           uri: thumbUrl,
+  //       //           galleryUrl: galleryUrl,
+  //       //           type: item.media_type,
+  //       //           notes: item.notes,
+  //       //           postedTime: item.created_at,
+  //       //           date: dayData.is_date,
+  //       //           mediaId: item.id,
+  //       //           created_by: item.created_by,
+  //       //         };
+  //       //       })
+  //       //       .filter(Boolean); // Removes any null items
+
+  //       //     if (dayItems.length > 0) {
+  //       //       if (!acc[dayData.is_date]) {
+  //       //         acc[dayData.is_date] = [];
+  //       //       }
+  //       //       acc[dayData.is_date].push(...dayItems);
+  //       //     }
+
+  //       //     return acc;
+  //       //   }, {});
+
+  //       //   if (currentPage === 1) {
+  //       //     // Initial data load, replace existing data
+  //       //     setGroupedMedia(grouped);
+  //       //   } else {
+  //       //     // Append new data to existing data
+  //       //     setGroupedMedia(prevGroupedMedia => {
+  //       //       const newGroupedMedia = {...prevGroupedMedia};
+  //       //       for (const date in grouped) {
+  //       //         if (newGroupedMedia[date]) {
+  //       //           // If date already exists, append the items
+  //       //           newGroupedMedia[date] = [
+  //       //             ...newGroupedMedia[date],
+  //       //             ...grouped[date],
+  //       //           ];
+  //       //         } else {
+  //       //           // If date doesn't exist, add the new date and items
+  //       //           newGroupedMedia[date] = grouped[date];
+  //       //         }
+  //       //       }
+  //       //       return newGroupedMedia;
+  //       //     });
+  //       //   }
+
+  //       //   setTotalPages(data.data.last_page); // Set total pages from response
+  //       //   setPage(currentPage); // Update current page state
+  //       // } else {
+  //       //   console.error('Invalid data format received from API:', data);
+  //       //   Alert.alert(
+  //       //     'Error',
+  //       //     'Failed to load media files. Invalid data format.',
+  //       //   );
+  //       // }
+  //     } catch (error) {
+  //       console.error('Error fetching photos/videos:', error);
+  //       // Alert.alert('Error', 'Failed to load photos and videos.');
+  //     } finally {
+  //       setApiLoading(false);
+  //       setIsFetchingMore(false); // End pagination loading
+  //     }
+  //   },
+  //   [selectedJob],
+  // );
 
   const sleep = time => new Promise(resolve => setTimeout(resolve, time));
 
@@ -247,31 +427,55 @@ const PhotosVideoScreen = ({selectedJob}) => {
     taskData,
     onProgressUpdate,
     onFileChange,
-    onUploadError, // Pass this from the caller to close modal & alert
+    onUploadError,
   ) => {
     const {files} = taskData;
     let totalSteps = 0;
     let completedSteps = 0;
 
     try {
-      // Step 1: Calculate total steps
+      // 1. Request notification permission (Android 13+)
+      await requestPermission();
+
+      // 2. Create notification channel
+      PushNotification.createChannel(
+        {
+          channelId: 'upload-channel',
+          channelName: 'Upload Notifications',
+          channelDescription: 'Notifications for file upload progress',
+          importance: 4,
+          vibrate: true,
+        },
+        created => console.log(`Notification channel created: ${created}`),
+      );
+
+      // 3. Show initial notification
+      PushNotification.localNotification({
+        channelId: 'upload-channel',
+        id: NOTIFICATION_ID,
+        title: 'Upload in progress',
+        message: 'Preparing to upload files...',
+        ongoing: true,
+      });
+
+      // 4. Calculate total upload steps
       for (let file of files) {
-        const presignedUrls = await getPresignedUrls(file); // may throw
+        const presignedUrls = await getPresignedUrls(file);
         totalSteps += presignedUrls.length;
       }
 
-      // Step 2: Start uploading
+      // 5. Start uploading each file
       for (let fileIndex = 0; fileIndex < files.length; fileIndex++) {
         const file = files[fileIndex];
-        onFileChange(file.name || file.fileName || 'Unnamed File');
+        const currentFileName = file.name || file.fileName || 'Unnamed File';
+        onFileChange(currentFileName);
 
         const extension = getExtensionFromUri(file.uri);
         const format = getFormatFromExtension(extension);
         const mimeType = file.type;
         const originalWidth = file.width;
         const originalHeight = file.height;
-
-        const presignedUrls = await getPresignedUrls(file); // may throw
+        const presignedUrls = await getPresignedUrls(file);
         const media_variants = [];
 
         for (let urlIndex = 0; urlIndex < presignedUrls.length; urlIndex++) {
@@ -279,7 +483,29 @@ const PhotosVideoScreen = ({selectedJob}) => {
           let resizedFile = file;
           const targetSize = getTargetSizeForKey(url.key);
 
-          if (targetSize) {
+          // Generate video thumbnail if needed
+          if (
+            url.key === 'thumb_video_image' &&
+            file.type.startsWith('video/')
+          ) {
+            try {
+              const thumbnail = await createThumbnail({
+                url: file.uri,
+                timeStamp: 1000,
+              });
+
+              resizedFile = {
+                uri: thumbnail.path,
+                width: thumbnail.width,
+                height: thumbnail.height,
+                fileName: `${file.fileName || 'video'}_thumbnail.png`,
+                type: 'image/png',
+                size: 0,
+              };
+            } catch (error) {
+              console.warn('Failed to generate video thumbnail:', error);
+            }
+          } else if (targetSize) {
             const {width, height} = calculateAspectFitSize(
               originalWidth,
               originalHeight,
@@ -289,6 +515,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
             resizedFile = await resizeImage(file, width, height, format);
           }
 
+          // Upload file to S3
           const uploadedUrl = await uploadToS3(
             url.url,
             resizedFile.uri,
@@ -303,12 +530,24 @@ const PhotosVideoScreen = ({selectedJob}) => {
             size: resizedFile.size || file.fileSize || 0,
           });
 
+          // 6. Update progress
           completedSteps++;
           const progress = Math.round((completedSteps / totalSteps) * 100);
           onProgressUpdate(progress);
+
+          // 📣 Update notification with current file name and progress
+          PushNotification.localNotification({
+            channelId: 'upload-channel',
+            id: NOTIFICATION_ID,
+            title: `Uploading: ${currentFileName}`,
+            message: `Progress: ${progress}%`,
+            ongoing: true,
+          });
+
           await sleep(100);
         }
 
+        // 7. Store metadata
         await storeMetadata({
           project_id: selectedJob.id,
           uuid: '59d09068-6f3d-482d-b166-fc29a8a13b31',
@@ -316,10 +555,27 @@ const PhotosVideoScreen = ({selectedJob}) => {
         });
       }
 
+      // 8. Final success notification
       onProgressUpdate(100);
+      PushNotification.localNotification({
+        channelId: 'upload-channel',
+        id: NOTIFICATION_ID,
+        title: 'Upload complete',
+        message: 'All files have been uploaded successfully.',
+        ongoing: false,
+      });
     } catch (error) {
-      // Alert + stop modal
-      onUploadError?.(error); // Call the callback to alert + close modal
+      console.error('Upload error:', error);
+      onUploadError?.(error);
+
+      // ❌ Error Notification
+      PushNotification.localNotification({
+        channelId: 'upload-channel',
+        id: NOTIFICATION_ID,
+        title: 'Upload failed',
+        message: 'An error occurred during upload.',
+        ongoing: false,
+      });
     } finally {
       await BackgroundService.stop();
     }
@@ -334,23 +590,8 @@ const PhotosVideoScreen = ({selectedJob}) => {
   };
 
   const handleLoadMore = () => {
-    if (!isFetchingMore && page < totalPages) {
-      fetchPhotoVideos(page + 1); // Load the next page
-    }
-  };
-
-  const pickImage = async () => {
-    try {
-      const response = await launchImageLibrary({
-        mediaType: 'mixed',
-        quality: 1,
-        selectionLimit: 0,
-      });
-      if (response.didCancel || response.errorCode) return null;
-      return response.assets;
-    } catch (error) {
-      console.error('❌ Error picking image:', error);
-      return null;
+    if (page < totalPages && !isFetchingMore) {
+      onRefresh(page + 1); // Load next page
     }
   };
 
@@ -498,33 +739,6 @@ const PhotosVideoScreen = ({selectedJob}) => {
         return {width: 600, height: 450};
       default:
         return null;
-    }
-  };
-
-  const requestAndroidPermissions = async () => {
-    try {
-      const granted = await PermissionsAndroid.requestMultiple([
-        PermissionsAndroid.PERMISSIONS.FOREGROUND_SERVICE,
-        PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
-        PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
-      ]);
-
-      const allGranted = Object.values(granted).every(
-        status => status === PermissionsAndroid.RESULTS.GRANTED,
-      );
-
-      if (!allGranted) {
-        Alert.alert(
-          'Permissions Required',
-          'All permissions are required to upload files.',
-        );
-        return false;
-      }
-
-      return true;
-    } catch (err) {
-      console.log('Error :', err);
-      return false;
     }
   };
 
@@ -786,7 +1000,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
   };
 
   // Function to handle setting the media as cover photo (placeholder)
-  const handleSetAsCoverPhoto = () => {
+  const handleSetAsCoverPhoto = media_id => {
     Alert.alert('Are you sure?', 'You want to set this file as cover photo!', [
       {
         text: 'Cancel',
@@ -803,7 +1017,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
               {
                 contractor_id: contractorId,
                 project_id: selectedJob.id,
-                media_id: selectedMediaForMenu.mediaId,
+                media_id: media_id,
               },
               {
                 headers: {
@@ -830,7 +1044,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
             setSettingCoverPhoto(false); // Hide loading indicator
             closeMediaMenu(); // Close the menu
             console.log(
-              'Set as Cover Photo : ' + selectedMediaForMenu.mediaId,
+              'Set as Cover Photo : ' + media_id,
               contractorId,
               selectedJob.id,
             );
@@ -1097,7 +1311,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
         end: moment(endDate).format('MMMM D, YYYY'),
       });
 
-      fetchPhotoVideos(1, startDate, endDate); // Reset to page 1 when applying date filter
+      onRefresh(1, startDate, endDate); // Reset to page 1 when applying date filter
     }
 
     setMenuVisible(false);
@@ -1125,7 +1339,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
     setTempEndDate(null);
     setFilterText('Filter');
     setFilterIcon('filter');
-    fetchPhotoVideos(1); // Fetch all data without date filter, reset to page 1
+    onRefresh(1); // Fetch all data without date filter, reset to page 1
   };
 
   const handleScroll = useCallback(
@@ -1253,7 +1467,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
         end: moment(tempEndDate).format('MMMM D, YYYY'),
       });
       setShowCalendar(false);
-      fetchPhotoVideos(1, tempStartDate, tempEndDate); // Reset to page 1 when applying date range
+      onRefresh(1, tempStartDate, tempEndDate); // Reset to page 1 when applying date range
     } else {
       Alert.alert('Please select a valid date range.');
     }
@@ -1377,6 +1591,12 @@ const PhotosVideoScreen = ({selectedJob}) => {
     return null;
   };
 
+  const onDelete = useCallback(media_id => {
+    setVideoImageListing(prevList =>
+      prevList.filter(item => item.id !== media_id),
+    );
+  }, []);
+
   return (
     <View style={styles.container}>
       {uploadingStatus.inProgress && (
@@ -1387,7 +1607,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
           </Text>
         </View>
       )}
-      {apiLoading && initialLoad ? ( // Show loader if API is loading and it's the initial load
+      {/* {apiLoading && initialLoad ? ( // Show loader if API is loading and it's the initial load
         <ActivityIndicator
           size="large"
           color="#007bff"
@@ -1408,7 +1628,18 @@ const PhotosVideoScreen = ({selectedJob}) => {
           onEndReached={handleLoadMore} // Load more data when reaching the end
           onEndReachedThreshold={0.5} // Trigger load more when 50% of the list is visible
         />
-      )}
+      )} */}
+      <MediaGallery
+        mediaList={videoImageListing}
+        onLoadMore={handleLoadMore}
+        isLoadingMore={false}
+        totalPages={totalPages}
+        currentPage={page}
+        selectedJob={selectedJob}
+        handleSetAsCoverPhoto={handleSetAsCoverPhoto}
+        onDelete={onDelete}
+        onRefresh={() => onRefresh(page)}
+      />
 
       <View style={styles.topRightContainer}>
         {uploading && (
@@ -1597,7 +1828,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
           </View>
         </View>
       </Modal>
-      <Modal visible={isUploading} transparent animationType="fade">
+      {/* <Modal visible={isUploading} transparent animationType="fade">
         <View style={styles.uploadModalContainer}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Uploading Files...</Text>
@@ -1611,7 +1842,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
             <Text>{uploadProgress}%</Text>
           </View>
         </View>
-      </Modal>
+      </Modal> */}
     </View>
   );
 };

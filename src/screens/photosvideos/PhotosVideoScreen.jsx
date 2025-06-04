@@ -432,30 +432,38 @@ const PhotosVideoScreen = ({selectedJob}) => {
     const {files} = taskData;
     let totalSteps = 0;
     let completedSteps = 0;
+    const totalFiles = files.length;
+    let uploadedFileCount = 0;
 
     try {
       // 1. Request notification permission (Android 13+)
       await requestPermission();
 
-      // 2. Create notification channel
+      // 2. Create notification channel (no sound/vibration)
       PushNotification.createChannel(
         {
           channelId: 'upload-channel',
           channelName: 'Upload Notifications',
           channelDescription: 'Notifications for file upload progress',
           importance: 4,
-          vibrate: true,
+          progress: 0,
+          vibrate: false,
+          soundName: 'none',
+          playSound: false,
         },
         created => console.log(`Notification channel created: ${created}`),
       );
 
-      // 3. Show initial notification
+      // 3. Initial notification
       PushNotification.localNotification({
         channelId: 'upload-channel',
         id: NOTIFICATION_ID,
         title: 'Upload in progress',
         message: 'Preparing to upload files...',
+        progress: 0,
         ongoing: true,
+        playSound: false,
+        vibrate: false,
       });
 
       // 4. Calculate total upload steps
@@ -464,7 +472,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
         totalSteps += presignedUrls.length;
       }
 
-      // 5. Start uploading each file
+      // 5. Start uploading
       for (let fileIndex = 0; fileIndex < files.length; fileIndex++) {
         const file = files[fileIndex];
         const currentFileName = file.name || file.fileName || 'Unnamed File';
@@ -483,7 +491,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
           let resizedFile = file;
           const targetSize = getTargetSizeForKey(url.key);
 
-          // Generate video thumbnail if needed
+          // Generate thumbnail for video
           if (
             url.key === 'thumb_video_image' &&
             file.type.startsWith('video/')
@@ -515,7 +523,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
             resizedFile = await resizeImage(file, width, height, format);
           }
 
-          // Upload file to S3
+          // Upload to S3
           const uploadedUrl = await uploadToS3(
             url.url,
             resizedFile.uri,
@@ -535,13 +543,20 @@ const PhotosVideoScreen = ({selectedJob}) => {
           const progress = Math.round((completedSteps / totalSteps) * 100);
           onProgressUpdate(progress);
 
-          // 📣 Update notification with current file name and progress
+          const remainingFiles = totalFiles - uploadedFileCount - 1;
+
           PushNotification.localNotification({
             channelId: 'upload-channel',
             id: NOTIFICATION_ID,
             title: `Uploading: ${currentFileName}`,
-            message: `Progress: ${progress}%`,
+            message:
+              `File ${fileIndex + 1}/${totalFiles} (${currentFileName})\n` +
+              `Progress: ${progress}%\n` +
+              `Uploaded Files: ${uploadedFileCount}, Remaining: ${remainingFiles}`,
+            progress: progress,
             ongoing: true,
+            playSound: false,
+            vibrate: false,
           });
 
           await sleep(100);
@@ -553,6 +568,8 @@ const PhotosVideoScreen = ({selectedJob}) => {
           uuid: '59d09068-6f3d-482d-b166-fc29a8a13b31',
           media_variants,
         });
+
+        uploadedFileCount++;
       }
 
       // 8. Final success notification
@@ -562,7 +579,10 @@ const PhotosVideoScreen = ({selectedJob}) => {
         id: NOTIFICATION_ID,
         title: 'Upload complete',
         message: 'All files have been uploaded successfully.',
+        progress: 100,
         ongoing: false,
+        playSound: false,
+        vibrate: false,
       });
     } catch (error) {
       console.error('Upload error:', error);
@@ -575,6 +595,8 @@ const PhotosVideoScreen = ({selectedJob}) => {
         title: 'Upload failed',
         message: 'An error occurred during upload.',
         ongoing: false,
+        playSound: false,
+        vibrate: false,
       });
     } finally {
       await BackgroundService.stop();

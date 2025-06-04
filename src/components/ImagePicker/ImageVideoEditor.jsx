@@ -258,7 +258,7 @@ const ImageVideoEditor = ({
 
   return (
     <View>
-      <TouchableOpacity onPress={openEditor}>
+      <TouchableOpacity onPress={openEditor} activeOpacity={0.2}>
         {children ?? <Text style={styles.buttonText}>Edit {media_type}</Text>}
       </TouchableOpacity>
 

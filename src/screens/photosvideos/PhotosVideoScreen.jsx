@@ -792,6 +792,8 @@ const PhotosVideoScreen = ({selectedJob}) => {
 
     try {
       const check = BackgroundService.isRunning();
+      console.log(check, 'check');
+
       if (check) {
         await BackgroundService.start(data => {
           setIsUploading(true);

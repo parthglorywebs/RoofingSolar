@@ -11,9 +11,9 @@ import Messages from '../screens/messages/MessageScreen';
 import Reports from '../screens/reports/Reports';
 import Profile from '../screens/auth/Profile';
 import {useNavigation} from '@react-navigation/native';
-import PropertyInfo from '../screens/propertyInfo/PropertyInfo';
+import PropertyInfo from '../screens/propertyInfo/LeadDetailInfo';
 import axios from 'axios';
-import { clearLoginDetails, getLoginDetails } from '../utils/AsyncStorage';
+import {clearLoginDetails, getLoginDetails} from '../utils/AsyncStorage';
 import config from '../config/config';
 
 const Tab = createBottomTabNavigator();
@@ -33,12 +33,11 @@ const LeadStackNavigator = () => (
   </Stack.Navigator>
 );
 
-
-
 const ProfileStackNavigator = () => {
   const navigation = useNavigation(); // Get navigation object
 
-  const handleLogout = async () => {  // Mark as async
+  const handleLogout = async () => {
+    // Mark as async
     Alert.alert('Logout Confirmation', 'Are you sure you want to logout?', [
       {
         text: 'Cancel',
@@ -46,9 +45,11 @@ const ProfileStackNavigator = () => {
       },
       {
         text: 'Logout',
-        onPress: async () => { // Mark as async
+        onPress: async () => {
+          // Mark as async
           try {
-            const {access_token, contractor_id, rememberMe } = await getLoginDetails();
+            const {access_token, contractor_id, rememberMe} =
+              await getLoginDetails();
 
             const formData = new FormData();
             formData.append('contractor_id', contractor_id);
@@ -88,28 +89,31 @@ const ProfileStackNavigator = () => {
     ]);
   };
 
-
   return (
     <Stack.Navigator>
-    <Stack.Screen
-      name="Profile"
-      component={Profile}
-      options={{
-        title: 'Profile',
-        headerTitleAlign: 'center',
-        headerStyle: {
-          backgroundColor: Colors.themeBlack,
-        },
-        headerTintColor: Colors.white,
-        headerBackTitleVisible: false,
-        headerRight: () => (
-          <TouchableOpacity onPress={handleLogout} style={{ marginRight: 15 }}>
-            <MaterialCommunityIcons name="logout" size={24} color={Colors.white} />
-          </TouchableOpacity>
-        ),
-      }}
-    />
-  </Stack.Navigator>
+      <Stack.Screen
+        name="Profile"
+        component={Profile}
+        options={{
+          title: 'Profile',
+          headerTitleAlign: 'center',
+          headerStyle: {
+            backgroundColor: Colors.themeBlack,
+          },
+          headerTintColor: Colors.white,
+          headerBackTitleVisible: false,
+          headerRight: () => (
+            <TouchableOpacity onPress={handleLogout} style={{marginRight: 15}}>
+              <MaterialCommunityIcons
+                name="logout"
+                size={24}
+                color={Colors.white}
+              />
+            </TouchableOpacity>
+          ),
+        }}
+      />
+    </Stack.Navigator>
   );
 };
 
@@ -136,9 +140,13 @@ const BottomTabNavigator = () => {
           //   />
           // ),
           // tabBarLabel: 'Home',
-            tabBarIcon: ({ color }) => (
-             <MaterialCommunityIcons name="view-dashboard" size={24} color={color} />
-           ),
+          tabBarIcon: ({color}) => (
+            <MaterialCommunityIcons
+              name="view-dashboard"
+              size={24}
+              color={color}
+            />
+          ),
           tabBarLabel: 'Dashboard',
           headerStyle: {
             backgroundColor: Colors.themeBlack,
@@ -206,12 +214,12 @@ const BottomTabNavigator = () => {
           ),
         }}
       /> */}
-     <Tab.Screen
+      <Tab.Screen
         name="Reports"
         component={Reports}
         options={{
           tabBarIcon: ({color}) => (
-           <MaterialCommunityIcons name="chart-bar" size={24} color={color} />
+            <MaterialCommunityIcons name="chart-bar" size={24} color={color} />
           ),
           tabBarLabel: 'Reports',
           headerStyle: {
@@ -229,8 +237,6 @@ const BottomTabNavigator = () => {
     </Tab.Navigator>
   );
 };
-
-
 
 const MainNavigator = () => (
   <Stack.Navigator screenOptions={{headerShown: false}}>

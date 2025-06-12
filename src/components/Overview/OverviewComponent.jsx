@@ -1,5 +1,12 @@
 import React from 'react';
-import {View, Text, StyleSheet, TouchableOpacity, Image} from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  ScrollView,
+} from 'react-native';
 import Colors from '../../assets/styling/colors';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import * as Progress from 'react-native-progress';
@@ -22,23 +29,24 @@ const OverviewComponent = ({
   jobActivity,
   selectedJob,
   itemData,
+  onChangeTab,
 }) => {
   const navigation = useNavigation();
 
   const getActivityRoute = label => {
     switch (label) {
       case 'Messages':
-        return 'Messages';
+        return 'message';
       case 'Documents':
-        return 'Documents';
+        return 'documents';
       case 'Photos':
-        return 'Photos & Videos';
+        return 'photos';
       case 'Worksheets':
-        return 'Worksheet';
+        return 'worksheet';
       case 'Payments':
         return 'Payments';
       default:
-        return 'Overview';
+        return 'overview';
     }
   };
 
@@ -48,7 +56,7 @@ const OverviewComponent = ({
     return (
       <TouchableOpacity
         style={styles.activityValueRow}
-        onPress={() => navigation.navigate(routeName)}>
+        onPress={() => onChangeTab(routeName)}>
         <MaterialCommunityIcons
           name={icons[label]}
           size={20}
@@ -97,7 +105,7 @@ const OverviewComponent = ({
   };
 
   return (
-    <View>
+    <ScrollView>
       <View style={styles.milestoneHeader}>
         <Text style={styles.milestoneHeaderText}>Milestones</Text>
         <Text style={styles.milestoneLastTouched}>
@@ -156,7 +164,7 @@ const OverviewComponent = ({
           {/* <ContactRow label="Lead Source:" value={generalInformation.lead_source} /> */}
         </View>
       </View>
-    </View>
+    </ScrollView>
   );
 };
 

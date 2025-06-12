@@ -10,12 +10,17 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
-  ScrollView, //Import ScrollView
+  ScrollView,
+  useWindowDimensions,
+  TouchableWithoutFeedback,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard, //Import ScrollView
 } from 'react-native';
 import {useColorScheme} from 'react-native';
 import {useRoute, useNavigation} from '@react-navigation/native';
+import {TabView, SceneMap, TabBar} from 'react-native-tab-view';
 import Colors from '../../assets/styling/colors';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import {Chip} from 'react-native-paper';
 import * as Progress from 'react-native-progress';
 import {getLoginDetails} from '../../utils/AsyncStorage';
@@ -23,11 +28,15 @@ import axios from 'axios';
 import config from '../../config/config';
 import OverviewComponent from '../../components/Overview/OverviewComponent';
 import {createMaterialTopTabNavigator} from '@react-navigation/material-top-tabs';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import MessagesScreen from '../messages/MessageScreen';
 import DocumentsTabs from '../tabs/Documents/DocumentsTabs';
 import PhotosVideoScreen from '../photosvideos/PhotosVideoScreen';
-import WorksheetTabs from '../tabs/Worksheets/WorksheetTabs';
+import WorksheetTabs from '../tabs/Worksheets/WorksheetScreen';
 import {getImageUrlByType} from '../../utils/common';
+import AccountingTabScreen from '../tabs/Accounting/AccountingTabScreen';
+import EstimateViewScreen from '../tabs/Estimate/EstimateViewScreen';
+import ComingSoon from '../../components/ComingSoon';
 
 const Tab = createMaterialTopTabNavigator();
 
@@ -41,12 +50,25 @@ const icons = {
   Documents: 'file-outline',
 };
 
+const routes = [
+  {key: 'overview', title: 'Overview', icon: 'information-outline'},
+  {key: 'message', title: 'Messages', icon: 'message-text-outline'},
+  {key: 'documents', title: 'Documents', icon: 'file-document-outline'},
+  {key: 'photos', title: 'Photos & Videos', icon: 'image-multiple-outline'},
+  {key: 'worksheet', title: 'Worksheet', icon: 'clipboard-text-outline'},
+  {key: 'account', title: 'Account', icon: 'account-cash-outline'},
+  {key: 'estimate', title: 'Estimate', icon: 'file-cabinet'},
+  {key: 'report', title: 'Report', icon: 'chart-box-outline'},
+];
+
 const PropertyInfo = () => {
   const route = useRoute();
   const navigation = useNavigation();
+  const layout = useWindowDimensions();
   const {itemData, selectedJob: initialSelectedJob} = route.params;
   const isDarkMode = useColorScheme() === 'dark';
   const backgroundStyle = {};
+  const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(true);
   const [projectOverviewData, setProjectOverviewData] = useState({
     instatus: '',
@@ -75,6 +97,32 @@ const PropertyInfo = () => {
 
   const [coverPhoto, setCoverPhoto] = useState(null);
   const [coverPhotoLoading, setCoverPhotoLoading] = useState(true);
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+
+  // useEffect(() => {
+  //   const keyboardDidShowListener = Keyboard.addListener(
+  //     'keyboardDidShow',
+  //     () => {
+  //       if (activeTab === 1) {
+  //         setKeyboardVisible(true);
+  //       }
+  //     },
+  //   );
+
+  //   const keyboardDidHideListener = Keyboard.addListener(
+  //     'keyboardDidHide',
+  //     () => {
+  //       if (activeTab === 1) {
+  //         setKeyboardVisible(false);
+  //       }
+  //     },
+  //   );
+
+  //   return () => {
+  //     keyboardDidShowListener.remove();
+  //     keyboardDidHideListener.remove();
+  //   };
+  // }, []);
 
   useEffect(() => {
     if (itemData) {
@@ -358,16 +406,121 @@ const PropertyInfo = () => {
     );
   }
 
+  const renderScene = ({route}) => {
+    switch (route.key) {
+      case 'overview':
+        return (
+          <ScrollView>
+            <OverviewComponent
+              projectOverviewData={projectOverviewData}
+              milestoneData={milestoneData}
+              currentPosition={currentPosition}
+              generalInformation={generalInformation}
+              jobActivity={jobActivity}
+              selectedJob={selectedJob}
+              itemData={itemData}
+            />
+          </ScrollView>
+        );
+      case 'message':
+        return (
+          <KeyboardAvoidingView
+            style={{flex: 1}}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}>
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+              <View style={{flex: 1}}>
+                <MessagesScreen selectedJob={selectedJob} />
+              </View>
+            </TouchableWithoutFeedback>
+          </KeyboardAvoidingView>
+        );
+
+      case 'documents':
+        return <DocumentsTabs selectedJob={selectedJob} />;
+      case 'photos':
+        return <PhotosVideoScreen selectedJob={selectedJob} />;
+      case 'worksheet':
+        return <WorksheetTabs selectedJob={selectedJob} />;
+      case 'account':
+        return <ComingSoon />;
+      case 'estimate':
+        return <ComingSoon />;
+      default:
+        return <ComingSoon />;
+    }
+  };
+
+  const renderTabBar = props => (
+    <TabBar
+      {...props}
+      indicatorStyle={{backgroundColor: '#007aff', height: 2}}
+      style={{
+        elevation: 0,
+        shadowOpacity: 0,
+        borderBottomWidth: 1,
+        borderColor: '#e0e0e0',
+        backgroundColor: '#fff', // or use Colors.tabBackground
+      }}
+      renderTabBarItem={({route, color}) => {
+        const index = routes.findIndex(a => a.key === route.key);
+        const focused = activeTab === index;
+        console.log(focused, 'focused');
+
+        return (
+          <TouchableOpacity
+            onPress={() => {
+              const selectIndex = routes.findIndex(a => a.key === route.key);
+              setActiveTab(selectIndex);
+            }}>
+            <View
+              style={{
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: layout.width / 4,
+                paddingVertical: 8,
+              }}>
+              <MaterialCommunityIcons
+                name={route.icon}
+                size={20}
+                color={focused ? '#007aff' : '#999'}
+              />
+              <Text
+                style={{
+                  color: focused ? '#007aff' : '#999',
+                  fontSize: 12,
+                  marginTop: 4,
+                }}>
+                {route.title}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        );
+      }}
+      activeColor="#007aff"
+      inactiveColor="#999"
+      scrollEnabled={true}
+      tabStyle={{width: layout.width / 4, flexDirection: 'column'}}
+    />
+  );
+
   return (
     <SafeAreaView style={[styles.container, backgroundStyle]}>
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
         backgroundColor={backgroundStyle.backgroundColor}
       />
-
+      {/* Dismiss keyboard when tapping outside */}
       <JobCardHeader />
-
-      <Tab.Navigator
+      <TabView
+        navigationState={{index: activeTab, routes}}
+        renderScene={renderScene}
+        initialLayout={{width: layout.width}}
+        renderTabBar={renderTabBar}
+        onIndexChange={index => setActiveTab(index)}
+        lazy
+      />
+      {/* <Tab.Navigator
         screenOptions={({route}) => ({
           tabBarScrollEnabled: true,
           tabBarStyle: {
@@ -515,7 +668,7 @@ const PropertyInfo = () => {
           }}
           children={() => <WorksheetTabs selectedJob={selectedJob} />}
         />
-      </Tab.Navigator>
+      </Tab.Navigator> */}
     </SafeAreaView>
   );
 };

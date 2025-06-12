@@ -65,8 +65,6 @@ const FinancialList = ({
 
       const data = response.data;
 
-      console.log(selectedJob.id);
-      
       if (data.success) {
         const {
           stages,
@@ -176,7 +174,7 @@ const FinancialList = ({
     setItemnameError('');
   };
 
- const handleDelete = itemId => {
+  const handleDelete = itemId => {
     Alert.alert(
       'Delete Item',
       'Are you sure you want to delete this item?',
@@ -188,12 +186,12 @@ const FinancialList = ({
           onPress: async () => {
             try {
               const {access_token, contractor_id} = await getLoginDetails();
-  
+
               const payload = new FormData();
               payload.append('contractor_id', contractorId);
               payload.append('project_id', selectedJob.id);
               payload.append('categorie_id', itemId);
-  
+
               const response = await axios.post(
                 `${config.baseUrl}contractor/delete-financial-worksheet-categories`,
                 payload,
@@ -202,15 +200,15 @@ const FinancialList = ({
                     Authorization: `Bearer ${access_token}`,
                     'Content-Type': 'multipart/form-data',
                   },
-                }
+                },
               );
-  
+
               const data = response.data;
-  
+
               if (data.success) {
                 Alert.alert('Success', data.message);
                 setFinancialData(prevData =>
-                  prevData.filter(item => item.id !== itemId)
+                  prevData.filter(item => item.id !== itemId),
                 );
                 onSubtotalChange(itemId, 0);
               } else {
@@ -223,7 +221,7 @@ const FinancialList = ({
           },
         },
       ],
-      { cancelable: false }
+      {cancelable: false},
     );
   };
 
@@ -262,18 +260,18 @@ const FinancialList = ({
   const handleSaveAddedItem = itemId => {
     setEditingAddedItemId(null);
   };
-const handleDeleteAddedItem = (categoryId, itemId) => {
+  const handleDeleteAddedItem = (categoryId, itemId) => {
     Alert.alert(
       'Delete Item',
       'Are you sure you want to delete this item?',
       [
-        { text: 'Cancel', style: 'cancel' },
+        {text: 'Cancel', style: 'cancel'},
         {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
             try {
-              const { access_token, contractor_id } = await getLoginDetails();
+              const {access_token, contractor_id} = await getLoginDetails();
 
               const payload = new FormData();
               payload.append('contractor_id', contractorId);
@@ -289,7 +287,7 @@ const handleDeleteAddedItem = (categoryId, itemId) => {
                     Authorization: `Bearer ${access_token}`,
                     'Content-Type': 'multipart/form-data',
                   },
-                }
+                },
               );
 
               const data = response.data;
@@ -297,11 +295,12 @@ const handleDeleteAddedItem = (categoryId, itemId) => {
               if (data.success) {
                 Alert.alert('Success', data.message);
                 // Optimistically update the UI: Remove the deleted item from the local state
-                setItems(prevItems => prevItems.filter(item => item.id !== itemId));
+                setItems(prevItems =>
+                  prevItems.filter(item => item.id !== itemId),
+                );
 
                 // After deleting, update subtotal in parent component
                 // You might need to recalculate the subtotal for the category and call onSubtotalChange
-
               } else {
                 Alert.alert('Error', data.message || 'Failed to delete item.');
               }
@@ -312,7 +311,7 @@ const handleDeleteAddedItem = (categoryId, itemId) => {
           },
         },
       ],
-      { cancelable: false }
+      {cancelable: false},
     );
   };
 
@@ -342,8 +341,8 @@ const handleDeleteAddedItem = (categoryId, itemId) => {
     }
   };
 
-   // Function to handle storing financial worksheet data
- /* const handleStoreFinancialWorksheetData = async (worksheetId, title, amount) => {
+  // Function to handle storing financial worksheet data
+  /* const handleStoreFinancialWorksheetData = async (worksheetId, title, amount) => {
     try {
       const { access_token, contractor_id } = await getLoginDetails();
 
@@ -380,8 +379,8 @@ const handleDeleteAddedItem = (categoryId, itemId) => {
     }
   }; */
 
-   // Function to handle updating financial worksheet data
-   /* const handleUpdateFinancialWorksheetData = async (itemId, title, amount) => {
+  // Function to handle updating financial worksheet data
+  /* const handleUpdateFinancialWorksheetData = async (itemId, title, amount) => {
     try {
       const { access_token, contractor_id } = await getLoginDetails();
 
@@ -418,7 +417,6 @@ const handleDeleteAddedItem = (categoryId, itemId) => {
     }
   };
  */
-
 
   if (loading) {
     return <ActivityIndicator size="large" color={Colors.primary} />;
@@ -651,7 +649,7 @@ const handleDeleteAddedItem = (categoryId, itemId) => {
                             <TouchableOpacity
                               style={styles.deleteButton}
                               onPress={() =>
-                                handleDeleteAddedItem(item.id,addedItem.id)
+                                handleDeleteAddedItem(item.id, addedItem.id)
                               }>
                               <Icon
                                 name="dots-vertical"

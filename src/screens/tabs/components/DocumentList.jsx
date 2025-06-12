@@ -217,7 +217,27 @@ const DocumentList = ({
       {isLoading ? (
         <ActivityIndicator size="large" color={Colors.primary} />
       ) : documents.length === 0 ? (
-        <Text style={styles.text}>No documents to display.</Text>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 20,
+          }}>
+          <MaterialCommunityIcons
+            name="file-document-outline"
+            size={64}
+            color="#ccc"
+            style={{marginBottom: 16}}
+          />
+          <Text
+            style={[
+              styles.text,
+              {fontSize: 16, color: '#888', textAlign: 'center'},
+            ]}>
+            No documents to display.
+          </Text>
+        </View>
       ) : (
         documents.map((document, index) => (
           <View key={index} style={styles.documentCard}>

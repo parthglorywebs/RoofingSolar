@@ -2,404 +2,393 @@ import React, {useState, useEffect, useRef} from 'react';
 import {
   SafeAreaView,
   StyleSheet,
-  Text,
   View,
-  TouchableOpacity,
+  Text,
   FlatList,
-  TextInput,
-  ActivityIndicator,
-  Alert,
+  Modal,
+  TouchableOpacity,
+  RefreshControl,
   Keyboard,
   TouchableWithoutFeedback,
-  Platform,
   KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+  PermissionsAndroid,
 } from 'react-native';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import Colors from '../../assets/styling/colors';
-import axios from 'axios';
-import config from '../../config/config';
+import PushNotification from 'react-native-push-notification';
+import {
+  fetchComments,
+  getPresignedUrls,
+  postComment,
+} from '../../services/commentService';
+import CommentItem from './components/CommentItem';
+import MessageInput from './components/MessageInput';
+import CommentsHeader from './components/CommentsHeader';
+import EmptyComments from './components/EmptyComments';
 import {getLoginDetails} from '../../utils/AsyncStorage';
-import moment from 'moment';
+import Colors from '../../assets/styling/colors';
 
-const MessagesScreen = ({selectedJob}) => {
-  const [form, setForm] = useState({newComment: ''});
-  const [error, setError] = useState({newComment: ''});
+export default function MessagesScreen({selectedJob, onBack}) {
+  const [messageText, setMessageText] = useState('');
   const [comments, setComments] = useState([]);
-  const [apiLoading, setApiLoading] = useState(true);
-  const [postingComment, setPostingComment] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState(null);
   const [userName, setUserName] = useState('');
-  const [isKeyboardVisible, setKeyboardVisible] = useState(false); // Track keyboard visibility
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [showAllModal, setShowAllModal] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const textInputRef = useRef(null); // Create a ref
+  const textInputRef = useRef(null);
 
-  useEffect(() => {
-    const fetchInitialData = async () => {
-      const {name} = await getLoginDetails();
-      setUserName(name);
-    };
-    fetchInitialData();
-    // textInputRef.current.focus();
-  }, []);
+  const parentComments = comments.filter(comment => !comment.parent_id);
+  const latestFiveComments = parentComments.slice(0, 5);
 
   useEffect(() => {
-    const keyboardDidShowListener = Keyboard.addListener(
-      'keyboardDidShow',
-      () => {
-        setKeyboardVisible(true); // Set keyboard visible state
-      },
-    );
-    const keyboardDidHideListener = Keyboard.addListener(
-      'keyboardDidHide',
-      () => {
-        setKeyboardVisible(false); // Set keyboard invisible state
-      },
-    );
-
-    return () => {
-      keyboardDidShowListener.remove();
-      keyboardDidHideListener.remove();
+    const loadInitialData = async () => {
+      try {
+        const {name} = await getLoginDetails();
+        setUserName(name);
+        await loadComments();
+      } catch {
+        setError('Failed to load data. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
     };
-  }, []);
+
+    loadInitialData();
+  }, [selectedJob.id]);
+
+  const loadComments = async () => {
+    try {
+      setIsLoading(true);
+      const commentsData = await fetchComments(selectedJob.id);
+      setComments(commentsData);
+    } catch {
+      setError('Failed to load comments. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handlePostComment = async () => {
-    const {newComment} = form;
-    const errors = {newComment: ''};
-    let isValid = true;
+    if (!messageText.trim()) return setError('Message cannot be empty');
+    setIsSubmitting(true);
+    try {
+      const {contractor_id} = await getLoginDetails();
+      const commentData = {
+        contractor_id,
+        project_id: selectedJob.id,
+        text: messageText,
+        ...(replyingTo ? {parent_id: replyingTo.id} : {}),
+      };
+      await postComment(commentData);
+      await loadComments();
+      setMessageText('');
+      setReplyingTo(null);
+    } catch {
+      setError('Failed to post comment.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-    if (!newComment.trim()) {
-      errors.newComment = 'Comment is required.';
-      isValid = false;
+  const requestPermission = async () => {
+    if (Platform.OS === 'android') {
+      const permissions = [
+        PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+        PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION,
+      ];
+      const granted = await PermissionsAndroid.requestMultiple(permissions);
+      return Object.values(granted).every(
+        status => status === PermissionsAndroid.RESULTS.GRANTED,
+      );
+    }
+    return true;
+  };
+
+  const handleUploadAndPostMediaComment = async asset => {
+    if (!asset?.uri || !asset?.type || !asset?.fileName) {
+      setError('Invalid file selected.');
+      return;
     }
 
-    setError(errors);
-    if (!isValid) return;
-
-    setPostingComment(true);
+    setIsSubmitting(true);
+    const notificationId = `${Date.now()}`;
 
     try {
-      const {access_token, contractor_id} = await getLoginDetails();
+      await requestPermission();
+      const {contractor_id} = await getLoginDetails();
+      const presignedUrls = await getPresignedUrls(asset, selectedJob?.id);
+      const uploadUrl = presignedUrls.find(a => a.key === 'original')?.url;
+      if (!uploadUrl) throw new Error('Presigned URL not received.');
 
-      const response = await axios.post(
-        `${config.baseUrl}contractor/add-comment-board`,
-        {
-          contractor_id: contractor_id,
+      PushNotification.localNotification({
+        channelId: 'upload-channel',
+        id: notificationId,
+        title: 'Upload in progress',
+        message: 'Preparing to upload files...',
+        progress: 0,
+        ongoing: true,
+        playSound: false,
+        vibrate: false,
+      });
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', uploadUrl);
+      xhr.setRequestHeader('Content-Type', asset.type);
+
+      xhr.upload.onprogress = function (event) {
+        if (event.lengthComputable) {
+          const percentComplete = Math.floor(
+            (event.loaded / event.total) * 100,
+          );
+          const currentFileName =
+            asset?.name || asset?.fileName || 'Unnamed File';
+          PushNotification.localNotification({
+            id: notificationId,
+            channelId: 'upload-channel',
+            title: `Uploading: ${currentFileName}`,
+            message: `Progress: ${percentComplete}%`,
+            progress: percentComplete,
+            ongoing: true,
+            playSound: false,
+            vibrate: false,
+          });
+        }
+      };
+
+      xhr.onload = async function () {
+        if (xhr.status !== 200) throw new Error('Upload failed');
+
+        const uploadedUrl = uploadUrl.split('?')[0];
+        const commentData = {
+          contractor_id,
           project_id: selectedJob.id,
-          text: newComment,
-        },
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-            Authorization: `Bearer ${access_token}`,
-          },
-        },
-      );
-
-      const data = response.data;
-      console.log(data, 'data');
-
-      if (data && data.success && data.data.original.success) {
-        const newCommentData = {
-          id: String(data.data.original.data.id),
-          text: data.data.original.data.text,
-          date: moment(data.data.original.data.created_at).format('YYYY-MM-DD'),
-          time: moment(data.data.original.data.created_at).format('hh:mm A'),
-          author: data.data.original.data.name,
-          created_at_human: data.data.original.data.created_at_human,
-          contractor_name: data.data.original.data.contractor_name,
-          created_at: data.data.original.data.created_at,
+          media_url: uploadedUrl,
+          media_type: asset.type,
+          text: asset?.fileName,
+          ...(replyingTo ? {parent_id: replyingTo.id} : {}),
         };
 
-        setComments(prevComments => [newCommentData, ...prevComments]);
-        setForm({newComment: ''});
-      } else {
-        Alert.alert('Error', 'Failed to post comment.');
-      }
-    } catch (error) {
-      console.error('Error posting comment:', error);
-      Alert.alert('Error', 'Failed to post comment.');
-    } finally {
-      setPostingComment(false);
+        await postComment(commentData);
+        await loadComments();
+        setReplyingTo(null);
+        PushNotification.localNotification({
+          channelId: 'upload-channel',
+          id: notificationId,
+          title: 'Upload complete',
+          message: 'Media uploaded and comment posted.',
+          progress: 100,
+          ongoing: false,
+          playSound: false,
+          vibrate: false,
+        });
+        setIsSubmitting(false);
+      };
+
+      xhr.onerror = function () {
+        setError('Upload failed.');
+        PushNotification.localNotification({
+          id: notificationId,
+          channelId: 'upload-channel',
+          title: 'Upload Failed',
+          message: 'There was an error uploading the media.',
+          progress: 100,
+          ongoing: false,
+          playSound: false,
+          vibrate: false,
+        });
+        setIsSubmitting(false);
+      };
+
+      xhr.send({uri: asset.uri, type: asset.type, name: asset.fileName});
+    } catch (err) {
+      console.error('Upload error:', err);
+      setError('Upload failed. Please try again.');
+      PushNotification.localNotification({
+        id: notificationId,
+        title: 'Upload Failed',
+        message: 'Something went wrong during upload.',
+      });
+      setIsSubmitting(false);
     }
   };
 
-  const renderComment = ({item, index}) => {
-    const isNewest = index === 0;
-    return (
-      <View style={styles.mergedContainer}>
-        <View style={styles.topContainer}>
-          <Text>
-            <Text
-              style={{
-                fontSize: 15,
-                fontWeight: 'bold',
-                color: Colors.themePlaceHolder,
-              }}>
-              {item.contractor_name}
-            </Text>
-            <Text
-              style={{
-                fontSize: 15,
-                color: Colors.themePlaceHolder,
-              }}>
-              {' '}
-              replied{' '}
-            </Text>
-            <Text
-              style={{
-                fontSize: 15,
-                fontWeight: 'bold',
-                color: Colors.themePlaceHolder,
-              }}>
-              {item.created_at_human}
-            </Text>
-          </Text>
-        </View>
-        <View
-          style={[
-            styles.cardView,
-            {backgroundColor: isNewest ? Colors.white : Colors.borderColor},
-          ]}>
-          <View style={styles.rowContainer}>
-            <View style={styles.circle}>
-              <Text style={styles.circleText}>
-                {item.author
-                  .split(' ')
-                  .map(name => name[0])
-                  .join('')}
-              </Text>
-            </View>
-            <View style={{flex: 1}}>
-              <View style={styles.nameDateRow}>
-                <Text
-                  style={[
-                    styles.nameText,
-                    {color: isNewest ? Colors.themeBlack : Colors.themeBlack},
-                  ]}>
-                  {item.author}
-                </Text>
-                <Text
-                  style={[
-                    styles.dateText,
-                    {color: isNewest ? Colors.themeBlack : Colors.themeBlack},
-                  ]}>
-                  {item.date}
-                </Text>
-              </View>
-              <Text
-                style={[
-                  styles.messageContent,
-                  {
-                    color: isNewest
-                      ? Colors.themePlaceHolder
-                      : Colors.themeBlack,
-                  },
-                ]}>
-                {item.text}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.timestampContainer}>
-            <Text
-              style={[
-                styles.timestampText,
-                {color: isNewest ? '#AEAEB2' : '#AEAEB2'},
-              ]}>
-              {item.time}
-            </Text>
-          </View>
-        </View>
-      </View>
-    );
+  const handleReply = comment => {
+    setReplyingTo(comment);
+    setTimeout(() => {
+      if (textInputRef.current) {
+        textInputRef.current.focus();
+      }
+    }, 100);
   };
 
-  const renderEmptyComponent = () => {
-    return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>No Comments</Text>
-      </View>
-    );
+  const handleLoadMore = async () => {
+    setShowAllModal(true);
+    await loadComments();
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await loadComments();
+    setIsRefreshing(false);
   };
 
   return (
-    <KeyboardAvoidingView
-      style={{flex: 1}}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 40 : 0}>
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-        <SafeAreaView style={styles.container}>
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.searchInput}
-              onChangeText={text => setForm({newComment: text})}
-              value={form.newComment}
-              placeholder="Messages"
-              onSubmitEditing={handlePostComment}
-              ref={textInputRef}
-              blurOnSubmit={false}
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.inner}>
+            <CommentsHeader count={comments.length} onBack={onBack} />
+
+            {comments.length > 5 && (
+              <TouchableOpacity
+                onPress={handleLoadMore}
+                style={styles.viewAllButton}>
+                <Text style={styles.viewAllText}>View All Comments</Text>
+              </TouchableOpacity>
+            )}
+
+            <FlatList
+              data={latestFiveComments}
+              keyExtractor={item => item.id.toString()}
+              renderItem={({item}) => (
+                <CommentItem
+                  item={item}
+                  onReply={handleReply}
+                  currentUserName={userName}
+                />
+              )}
+              style={{flex: 1}}
+              contentContainerStyle={{flexGrow: 1, paddingBottom: 10}}
+              keyboardShouldPersistTaps="handled"
+              ListEmptyComponent={<EmptyComments />}
+              ListFooterComponent={
+                isLoading ? (
+                  <View style={styles.loaderContainer}>
+                    <ActivityIndicator size="large" color={Colors.primary} />
+                    <Text style={styles.loadingText}>Loading comments...</Text>
+                  </View>
+                ) : error ? (
+                  <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>{error}</Text>
+                  </View>
+                ) : null
+              }
             />
-            <TouchableOpacity
-              onPress={handlePostComment}
-              disabled={postingComment}>
-              <View style={{flexDirection: 'row'}}>
-                <MaterialCommunityIcons
-                  name={'image-multiple'}
-                  size={16}
-                  color={Colors.themePlaceHolder}
-                  style={styles.icon}
-                />
 
-                <MaterialCommunityIcons
-                  name={'account'}
-                  size={16}
-                  color={Colors.themePlaceHolder}
-                  style={styles.icon}
-                />
+            <MessageInput
+              value={messageText}
+              onChangeText={setMessageText}
+              onSubmit={handlePostComment}
+              isSubmitting={isSubmitting}
+              replyingTo={replyingTo}
+              onCancelReply={() => setReplyingTo(null)}
+              inputRef={textInputRef}
+              onCamera={handleUploadAndPostMediaComment}
+              onGallery={handleUploadAndPostMediaComment}
+              onVideo={handleUploadAndPostMediaComment}
+            />
+          </View>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
 
-                <MaterialCommunityIcons
-                  name={'camera'}
-                  size={16}
-                  color={Colors.themePlaceHolder}
-                  style={styles.icon}
-                />
-              </View>
+      <Modal
+        visible={showAllModal}
+        animationType="slide"
+        onRequestClose={() => setShowAllModal(false)}>
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>All Comments</Text>
+            <TouchableOpacity onPress={() => setShowAllModal(false)}>
+              <Text style={styles.closeText}>Close</Text>
             </TouchableOpacity>
           </View>
-          {error.newComment ? (
-            <Text style={styles.errorText}>{error.newComment}</Text>
-          ) : null}
-
-          {postingComment ? (
-            <ActivityIndicator size="large" color="#007bff" />
-          ) : apiLoading ? (
-            <ActivityIndicator
-              size="large"
-              color="#007bff"
-              style={{marginTop: '50%'}}
-            />
-          ) : (
+          <View style={{flex: 1}}>
             <FlatList
               data={comments}
-              keyExtractor={item => item.id}
-              renderItem={renderComment}
-              contentContainerStyle={styles.commentsListContainer}
-              ListEmptyComponent={renderEmptyComponent}
+              keyExtractor={item => item.id.toString()}
+              renderItem={({item}) => (
+                <CommentItem
+                  item={item}
+                  onReply={handleReply}
+                  currentUserName={userName}
+                />
+              )}
+              contentContainerStyle={{flexGrow: 1}}
+              showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl
+                  refreshing={isRefreshing}
+                  onRefresh={handleRefresh}
+                  colors={[Colors.primary]}
+                  tintColor={Colors.primary}
+                />
+              }
             />
-          )}
+          </View>
+
+          <MessageInput
+            value={messageText}
+            onChangeText={setMessageText}
+            onSubmit={handlePostComment}
+            isSubmitting={isSubmitting}
+            replyingTo={replyingTo}
+            onCancelReply={() => setReplyingTo(null)}
+            inputRef={textInputRef}
+            onCamera={handleUploadAndPostMediaComment}
+            onGallery={handleUploadAndPostMediaComment}
+            onVideo={handleUploadAndPostMediaComment}
+          />
         </SafeAreaView>
-      </TouchableWithoutFeedback>
-    </KeyboardAvoidingView>
+      </Modal>
+    </SafeAreaView>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-    // padding: 15,
-    marginTop: 5,
-  },
-  inputContainer: {
-    flexDirection: 'row',
+  container: {flex: 1, backgroundColor: '#F8F8F8'},
+  loaderContainer: {flex: 1, justifyContent: 'center', alignItems: 'center'},
+  loadingText: {marginTop: 12, fontSize: 14, color: Colors.themePlaceHolder},
+  errorContainer: {padding: 20, alignItems: 'center', justifyContent: 'center'},
+  errorText: {color: Colors.error || '#FF3B30', textAlign: 'center'},
+  viewAllButton: {
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 30,
-    borderWidth: 1,
-    borderColor: 'gray',
-    paddingHorizontal: 15,
-    marginHorizontal: 10,
-    // marginBottom: 15,
+    marginTop: 8,
+    marginBottom: 16,
   },
-  searchInput: {
-    flex: 1,
-    height: 40,
-    fontSize: 16,
-  },
-  icon: {
-    marginLeft: 10,
-  },
-  errorText: {
-    color: 'red',
-    fontSize: 12,
-    marginBottom: 10,
-  },
-  commentsListContainer: {
-    paddingBottom: 20,
-    flexGrow: 1,
-  },
-  cardView: {
-    backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  rowContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  circle: {
-    width: 50,
-    height: 50,
-    backgroundColor: '#5FA3B2',
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  circleText: {
-    color: '#fff',
-    fontSize: 18,
+  viewAllText: {
+    color: Colors.primary,
     fontWeight: 'bold',
+    fontSize: 14,
   },
-  nameDateRow: {
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#FFF',
+  },
+  modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderColor: '#ddd',
   },
-  nameText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-  dateText: {
-    fontSize: 14,
-    color: '#555',
-  },
-  messageContent: {
-    fontSize: 14,
-    color: '#333',
-  },
-  timestampContainer: {
-    alignSelf: 'flex-end',
-  },
-  timestampText: {
-    fontSize: 12,
-    color: '#999',
-  },
-  topContainer: {
-    backgroundColor: '#E3E3E3',
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    borderTopLeftRadius: 10,
-    borderTopRightRadius: 10,
-  },
-  mergedContainer: {
-    borderRadius: 10,
-    overflow: 'hidden',
-    width: '100%',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyText: {
+  modalTitle: {
     fontSize: 18,
-    color: Colors.themePlaceHolder,
+    fontWeight: 'bold',
+    color: Colors.themeBlack,
+  },
+  closeText: {
+    fontSize: 14,
+    color: Colors.primary,
+  },
+  inner: {
+    flex: 1,
+    justifyContent: 'flex-end',
   },
 });
-
-export default MessagesScreen;

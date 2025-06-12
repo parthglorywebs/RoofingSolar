@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   RefreshControl,
+  useWindowDimensions,
 } from 'react-native';
 import {Avatar} from 'react-native-paper';
 import FastImage from 'react-native-fast-image';
@@ -66,6 +67,7 @@ export default function MediaGallery({
   onDelete,
   onRefresh,
 }) {
+  const layout = useWindowDimensions();
   const [selectedItems, setSelectedItems] = useState([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [refreshing, setRefreshing] = useState(false);

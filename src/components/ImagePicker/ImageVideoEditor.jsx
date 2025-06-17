@@ -281,7 +281,7 @@ const ImageVideoEditor = ({
                 <Icon name="pencil" size={28} color="#fff" />
               </TouchableOpacity>
             ) : (
-              <Text>X</Text>
+              <Text />
             )}
           </View>
           {media_type === 'video' ? (
@@ -302,8 +302,12 @@ const ImageVideoEditor = ({
             <>
               {/* Image */}
               <ImagePreviewer
+                mediaUrls={mediaList
+                  .filter(m => m.media_type === 'image')
+                  .map(m => m.url)}
                 mediaUrl={media_url}
-                setPreviewVisible={() => setPreviewVisible(false)}
+                initialIndex={mediaList.findIndex(m => m.id === media.id)}
+                setPreviewVisible={setPreviewVisible}
               />
             </>
           )}

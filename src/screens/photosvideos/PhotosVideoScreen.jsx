@@ -15,6 +15,9 @@ import {
   ScrollView,
   Platform,
   PermissionsAndroid,
+  NativeModules,
+  NativeEventEmitter,
+  AppState,
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import {launchImageLibrary} from 'react-native-image-picker';
@@ -27,15 +30,21 @@ import {Menu, Provider, Divider} from 'react-native-paper';
 import {getLoginDetails} from '../../utils/AsyncStorage';
 import Colors from '../../assets/styling/colors';
 import {Calendar} from 'react-native-calendars';
-import ImageViewer from 'react-native-image-zoom-viewer';
+import RNFS from 'react-native-fs';
 import FastImage from 'react-native-fast-image';
 import BackgroundService from 'react-native-background-actions';
 import {createThumbnail} from 'react-native-create-thumbnail';
 import PushNotification from 'react-native-push-notification';
 // import notifee, {AndroidImportance} from '@notifee/react-native';
 import {getImageUrlByType} from '../../utils/common';
+// import RNFileUploader from '../../utils/FileUpload';
 import ImageSelector from '../../components/ImagePicker/ImageSelector';
 import MediaGallery from './MediaGallery';
+import uuid from 'react-native-uuid';
+
+const {MyServiceModule} = NativeModules;
+
+const eventEmitter = new NativeEventEmitter(MyServiceModule);
 
 const {width, height} = Dimensions.get('window');
 const NOTIFICATION_ID = 999;
@@ -49,7 +58,8 @@ const PhotosVideoScreen = ({selectedJob}) => {
   const [focusedIndex, setFocusedIndex] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
   const [uploading, setUploading] = useState(false);
   const [projectId, setProjectId] = useState(null);
   const flatListRef = useRef(null);
@@ -150,6 +160,13 @@ const PhotosVideoScreen = ({selectedJob}) => {
     return mediaList;
   };
 
+  const preloadInChunks = (images, chunkSize = 10) => {
+    for (let i = 0; i < images.length; i += chunkSize) {
+      const chunk = images.slice(i, i + chunkSize);
+      FastImage.preload(chunk);
+    }
+  };
+
   const onRefresh = useCallback(
     async (currentPage = 1, fromDate = null, toDate = null) => {
       if (currentPage === 1) {
@@ -215,6 +232,19 @@ const PhotosVideoScreen = ({selectedJob}) => {
           };
         });
         if (formattedItems?.length > 0) {
+          const safeMap = (items, key) =>
+            items
+              .filter(item => item.type === 'image' && item[key])
+              .map(item => ({uri: item[key]}));
+
+          const thumbnails = safeMap(formattedItems, 'thumbnail');
+          const gallery = safeMap(formattedItems, 'url');
+          const originals = safeMap(formattedItems, 'original');
+
+          preloadInChunks(thumbnails);
+          preloadInChunks(gallery);
+          preloadInChunks(originals);
+
           if (currentPage === 1) {
             setVideoImageListing(formattedItems);
           } else {
@@ -764,9 +794,109 @@ const PhotosVideoScreen = ({selectedJob}) => {
     }
   };
 
+  const requestMultiPermission = async () => {
+    if (Platform.OS === 'android') {
+      const permissions = [
+        PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+        PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION,
+        PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+        PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
+      ];
+
+      const granted = await PermissionsAndroid.requestMultiple(permissions);
+      console.log(granted);
+
+      return Object.values(granted).every(
+        status => status === PermissionsAndroid.RESULTS.GRANTED,
+      );
+    }
+    return true;
+  };
+
+  const requestBackgroundPermission = async fileList => {
+    try {
+      const check = await await MyServiceModule.startBackgroundService(
+        fileList,
+      );
+      return check;
+    } catch (error) {
+      console.log(error, 'error');
+      return false;
+    }
+  };
+
+  const backgroundUploadAndroid = async files => {
+    setLoading(true);
+    setMessage('Preparing files...');
+
+    await requestMultiPermission();
+    const uploadingFiles = [];
+    const {access_token} = await getLoginDetails();
+
+    const mediaDir =
+      Platform.OS === 'android'
+        ? `${RNFS.ExternalStorageDirectoryPath}/Android/media/com.roofingsolar/media`
+        : `${RNFS.DocumentDirectoryPath}/media`;
+
+    const targetExists = await RNFS.exists(mediaDir);
+    if (!targetExists) {
+      await RNFS.mkdir(mediaDir);
+    }
+
+    let allCopiedSuccessfully = true;
+
+    for (let file of files) {
+      const presignedUrls = await getPresignedUrls(file);
+      const fileName = file?.name || `upload_${Date.now()}`;
+      const destPath = `${mediaDir}/${fileName}`;
+      const selectPath = file?.path ?? file?.originalPath ?? null;
+
+      try {
+        if (!selectPath) {
+          throw new Error('No valid path');
+        }
+
+        if (selectPath !== destPath) {
+          await RNFS.copyFile(selectPath, destPath);
+          console.log(`✅ Copied to: ${destPath}`);
+        }
+
+        uploadingFiles.push({
+          fileUrl: destPath,
+          projectId: selectedJob.id?.toString(),
+          accessToken: access_token,
+          presignedUrl: presignedUrls,
+        });
+      } catch (e) {
+        console.error(`❌ Failed to copy ${file.path} to ${destPath}`, e);
+        allCopiedSuccessfully = false;
+        break;
+      }
+    }
+
+    if (!allCopiedSuccessfully || uploadingFiles.length === 0) {
+      setLoading(false);
+      Alert.alert('Error', 'File preparation failed. Please try again.');
+      return false;
+    }
+
+    setMessage('File prepared');
+    setTimeout(() => {
+      setLoading(false);
+      setMessage('');
+    }, 1500);
+
+    const result = await requestBackgroundPermission(uploadingFiles);
+    return result;
+  };
+
   const processAndUpload = async files => {
     // const files = await pickImage();
     if (!files) return;
+    if (Platform.OS === 'android') {
+      backgroundUploadAndroid(files);
+      return true;
+    }
 
     setUploadingStatus({
       processing: 0,
@@ -775,42 +905,59 @@ const PhotosVideoScreen = ({selectedJob}) => {
       inProgress: true,
     });
 
-    const options = {
-      taskName: 'Uploader',
-      taskTitle: 'Uploading files',
-      taskDesc: 'Your files are uploading in the background',
-      taskIcon: {
-        name: 'ic_launcher',
-        type: 'mipmap',
-      },
-      color: '#ff00ff',
-      linkingURI: 'yourSchemeHere://myapp',
-      parameters: {
-        files,
-      },
-    };
-
     try {
+      // const veryIntensiveTask = async taskDataArguments => {
+      //   // Example of an infinite loop task
+      //   const {delay} = taskDataArguments;
+      //   await new Promise(async resolve => {
+      //     for (let i = 0; BackgroundService.isRunning(); i++) {
+      //       console.log(i);
+      //       await sleep(delay);
+      //     }
+      //   });
+      // };
+
+      const options = {
+        taskName: 'Example',
+        taskTitle: 'ExampleTask title',
+        taskDesc: 'ExampleTask description',
+        taskIcon: {
+          name: 'ic_launcher',
+          type: 'mipmap',
+        },
+        color: '#ff00ff',
+        linkingURI: 'yourSchemeHere://chat/jane', // See Deep Linking for more info
+        parameters: {
+          delay: 1000,
+        },
+      };
+
+      // await BackgroundService.start(veryIntensiveTask, options);
+      // await BackgroundService.updateNotification({
+      //   taskDesc: 'New ExampleTask description',
+      // }); // Only Android, iOS will ignore this call
+      // // iOS will also run everything here in the background until .stop() is called
+      // await BackgroundService.stop();
+
       const check = BackgroundService.isRunning();
       console.log(check, 'check');
-
-      if (check) {
-        await BackgroundService.start(data => {
-          setIsUploading(true);
-          backgroundUploadTask(
-            data,
-            progress => setUploadProgress(progress),
-            fileName => setCurrentUploadFileName(fileName),
-            handleUploadError,
-          ).then(() => {
-            setIsUploading(false);
-            setCurrentUploadFileName('');
-          });
-        }, options);
-      } else {
+      // await BackgroundService.start(data => {
+      //   setIsUploading(true);
+      //   backgroundUploadTask(
+      //     data,
+      //     progress => setUploadProgress(progress),
+      //     fileName => setCurrentUploadFileName(fileName),
+      //     handleUploadError,
+      //   ).then(() => {
+      //     setIsUploading(false);
+      //     setCurrentUploadFileName('');
+      //   });
+      // }, options);
+      // if (check) {
+      await BackgroundService.start(data => {
         setIsUploading(true);
         backgroundUploadTask(
-          {files},
+          data,
           progress => setUploadProgress(progress),
           fileName => setCurrentUploadFileName(fileName),
           handleUploadError,
@@ -818,7 +965,19 @@ const PhotosVideoScreen = ({selectedJob}) => {
           setIsUploading(false);
           setCurrentUploadFileName('');
         });
-      }
+      }, options);
+      // } else {
+      setIsUploading(true);
+      backgroundUploadTask(
+        {files},
+        progress => setUploadProgress(progress),
+        fileName => setCurrentUploadFileName(fileName),
+        handleUploadError,
+      ).then(() => {
+        setIsUploading(false);
+        setCurrentUploadFileName('');
+      });
+      // }
     } catch (error) {
       console.warn('Background service not available, uploading directly.');
       // Fallback to direct upload
@@ -1656,13 +1815,13 @@ const PhotosVideoScreen = ({selectedJob}) => {
       <MediaGallery
         mediaList={videoImageListing}
         onLoadMore={handleLoadMore}
-        isLoadingMore={false}
+        isLoadingMore={apiLoading}
         totalPages={totalPages}
         currentPage={page}
         selectedJob={selectedJob}
         handleSetAsCoverPhoto={handleSetAsCoverPhoto}
         onDelete={onDelete}
-        onRefresh={() => onRefresh(page)}
+        onRefresh={pageNumber => onRefresh(pageNumber ?? page)}
       />
 
       <View style={styles.topRightContainer}>
@@ -1867,6 +2026,27 @@ const PhotosVideoScreen = ({selectedJob}) => {
           </View>
         </View>
       </Modal> */}
+      <Modal visible={loading} transparent animationType="fade">
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}>
+          <View
+            style={{
+              padding: 20,
+              backgroundColor: 'white',
+              borderRadius: 10,
+              alignItems: 'center',
+              width: 250,
+            }}>
+            <ActivityIndicator size="large" color="#007AFF" />
+            <Text style={{marginTop: 15, textAlign: 'center'}}>{message}</Text>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };

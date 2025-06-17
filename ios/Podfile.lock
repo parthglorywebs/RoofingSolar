@@ -1372,7 +1372,7 @@ PODS:
     - Yoga
   - react-native-netinfo (11.4.1):
     - React-Core
-  - react-native-pager-view (6.8.0):
+  - react-native-pager-view (6.8.1):
     - DoubleConversion
     - glog
     - hermes-engine
@@ -1535,7 +1535,7 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - Yoga
-  - react-native-webview (13.13.5):
+  - react-native-webview (13.14.2):
     - DoubleConversion
     - glog
     - hermes-engine
@@ -1851,7 +1851,7 @@ PODS:
     - Yoga
   - rn-fetch-blob (0.12.0):
     - React-Core
-  - RNCAsyncStorage (2.1.2):
+  - RNCAsyncStorage (2.2.0):
     - DoubleConversion
     - glog
     - hermes-engine
@@ -1934,7 +1934,7 @@ PODS:
     - React-Core
     - React-RCTImage
     - TOCropViewController (~> 2.7.4)
-  - RNReanimated (3.17.5):
+  - RNReanimated (3.18.0):
     - DoubleConversion
     - glog
     - hermes-engine
@@ -1956,10 +1956,10 @@ PODS:
     - ReactCodegen
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
-    - RNReanimated/reanimated (= 3.17.5)
-    - RNReanimated/worklets (= 3.17.5)
+    - RNReanimated/reanimated (= 3.18.0)
+    - RNReanimated/worklets (= 3.18.0)
     - Yoga
-  - RNReanimated/reanimated (3.17.5):
+  - RNReanimated/reanimated (3.18.0):
     - DoubleConversion
     - glog
     - hermes-engine
@@ -1981,9 +1981,9 @@ PODS:
     - ReactCodegen
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
-    - RNReanimated/reanimated/apple (= 3.17.5)
+    - RNReanimated/reanimated/apple (= 3.18.0)
     - Yoga
-  - RNReanimated/reanimated/apple (3.17.5):
+  - RNReanimated/reanimated/apple (3.18.0):
     - DoubleConversion
     - glog
     - hermes-engine
@@ -2006,7 +2006,7 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - Yoga
-  - RNReanimated/worklets (3.17.5):
+  - RNReanimated/worklets (3.18.0):
     - DoubleConversion
     - glog
     - hermes-engine
@@ -2028,9 +2028,9 @@ PODS:
     - ReactCodegen
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
-    - RNReanimated/worklets/apple (= 3.17.5)
+    - RNReanimated/worklets/apple (= 3.18.0)
     - Yoga
-  - RNReanimated/worklets/apple (3.17.5):
+  - RNReanimated/worklets/apple (3.18.0):
     - DoubleConversion
     - glog
     - hermes-engine
@@ -2465,12 +2465,12 @@ SPEC CHECKSUMS:
   react-native-image-picker: 114f3eecf420982e6ad5525c63eb000b0816ba76
   react-native-image-resizer: 835c013ad7f8225e378f17e277eced97a03d70c0
   react-native-netinfo: f0a9899081c185db1de5bb2fdc1c88c202a059ac
-  react-native-pager-view: 742ea6686dbe9921832fc35eaeb8ce24f0add176
+  react-native-pager-view: cc52358e8f18ad4ae81f9a30d4423ab73dddec5a
   react-native-photo-editor: df7a23b0f31379ca5f64671f7d9fc42dbdd68722
   react-native-safe-area-context: 56f6a226ce946d7bd1cc232aea54d23cb1a852a1
   react-native-splash-screen: 4312f786b13a81b5169ef346d76d33bc0c6dc457
   react-native-video: aae9420b086a797b14f34d805e15fb6006224b88
-  react-native-webview: 28f93bd4da9c9f0bf0eb6325535d004a50697035
+  react-native-webview: 7e0507e49529e26404dd5a37db31f2f8ad3d19b9
   React-nativeconfig: 8efdb1ef1e9158c77098a93085438f7e7b463678
   React-NativeModulesApple: 958d4f6c5c2ace4c0f427cf7ef82e28ae6538a22
   React-perflogger: 9b4f13c0afe56bc7b4a0e93ec74b1150421ee22d
@@ -2500,7 +2500,7 @@ SPEC CHECKSUMS:
   ReactCommon: bfd3600989d79bc3acbe7704161b171a1480b9fd
   ReactNativeCameraKit: f4e35e306d8c68d223324336b37cd241442dc0c7
   rn-fetch-blob: f065bb7ab7fb48dd002629f8bdcb0336602d3cba
-  RNCAsyncStorage: 6afcd80a5b7f25742648444dfc4b166518d239fd
+  RNCAsyncStorage: 8724c3be379a3d5a02ba83e276d79c2899f8d53c
   RNCCheckbox: 471ebdc33884c084f362615c1ef3507496cc07f1
   RNCPicker: 8067a04b7d5b21ef35e3a1da978d9049aca95ff2
   RNFastImage: 5c9c9fed9c076e521b3f509fe79e790418a544e8
@@ -2508,7 +2508,7 @@ SPEC CHECKSUMS:
   RNFS: 4ac0f0ea233904cb798630b3c077808c06931688
   RNGestureHandler: 70b13f8ce59310fcd4e2b4170d7c5ad85f991867
   RNImageCropPicker: 64b6bec9ec185ee59b71a93d7058816bd0e1916e
-  RNReanimated: e70ef65973823dbf0e85a0aec48e9383fb77d72f
+  RNReanimated: dfecc438b1d00556cfe08da5d30952a94d113e90
   RNScreens: 64ed41cd213a554c67683b6d04952c6ba1d19b24
   RNVectorIcons: eacd321244b1bd2a70d69dcb54cb875c69da1d3b
   SDWebImage: a7f831e1a65eb5e285e3fb046a23fcfbf08e696d

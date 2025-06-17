@@ -84,7 +84,7 @@ export default function MediaGallery({
   const handleRefresh = async () => {
     try {
       setRefreshing(true);
-      await onRefresh?.(); // If onRefresh is passed as prop
+      await onRefresh?.(1); // If onRefresh is passed as prop
     } finally {
       setRefreshing(false);
     }

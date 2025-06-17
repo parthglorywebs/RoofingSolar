@@ -1,5 +1,12 @@
 import React, {useEffect, useState, useCallback} from 'react';
-import {SafeAreaView, ActivityIndicator, Alert, Text} from 'react-native';
+import {
+  SafeAreaView,
+  ActivityIndicator,
+  Alert,
+  Text,
+  NativeModules,
+  NativeEventEmitter,
+} from 'react-native';
 import {NavigationContainer} from '@react-navigation/native';
 import {Provider as PaperProvider} from 'react-native-paper';
 import {Provider} from 'react-redux';

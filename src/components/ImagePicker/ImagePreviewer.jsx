@@ -1,9 +1,21 @@
-import React from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {View, ActivityIndicator, StyleSheet} from 'react-native';
 import ImageViewer from 'react-native-image-zoom-viewer';
 import FastImage from 'react-native-fast-image';
 
-const ImagePreviewer = ({mediaUrl, setPreviewVisible}) => {
+const ImagePreviewer = ({
+  mediaUrl,
+  mediaUrls,
+  initialIndex,
+  setPreviewVisible,
+}) => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    if (initialIndex > -1) {
+      setCurrentIndex(initialIndex);
+    }
+  }, [initialIndex]);
   // Custom loader
   const loadingRender = () => (
     <View style={styles.loaderContainer}>
@@ -12,22 +24,32 @@ const ImagePreviewer = ({mediaUrl, setPreviewVisible}) => {
   );
 
   // Use FastImage to load and cache the image
-  const renderImage = props => (
-    <FastImage
-      style={props.style}
-      source={{
-        uri: props.source.uri,
-        priority: FastImage.priority.high,
-      }}
-      resizeMode={FastImage.resizeMode.contain}
-    />
-  );
+  const renderImage = props => {
+    console.log(props.source, 'props.source');
+
+    return (
+      <FastImage
+        style={props.style}
+        source={{
+          uri: props.source.uri,
+          priority: FastImage.priority.high,
+          cache: FastImage.cacheControl.immutable,
+        }}
+        resizeMode={FastImage.resizeMode.contain}
+      />
+    );
+  };
+
+  const imageUrls = useMemo(() => {
+    return mediaUrls.map(url => ({url}));
+  }, [mediaUrls]);
 
   return (
     <View style={styles.container}>
       <ImageViewer
-        imageUrls={[{url: mediaUrl}]}
+        imageUrls={imageUrls}
         visible={true}
+        index={currentIndex}
         enableSwipeDown
         onSwipeDown={() => setPreviewVisible(false)}
         backgroundColor="#000"
@@ -35,6 +57,7 @@ const ImagePreviewer = ({mediaUrl, setPreviewVisible}) => {
         loadingRender={loadingRender}
         renderImage={renderImage}
         enablePreload={true}
+        enableImageZoom={true}
       />
     </View>
   );

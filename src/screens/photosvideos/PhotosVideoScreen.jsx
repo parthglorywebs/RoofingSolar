@@ -20,7 +20,7 @@ import {
   AppState,
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import {launchImageLibrary} from 'react-native-image-picker';
+import DeviceInfo from 'react-native-device-info';
 import ImageResizer from '@bam.tech/react-native-image-resizer';
 import moment from 'moment';
 import axios from 'axios';
@@ -825,19 +825,39 @@ const PhotosVideoScreen = ({selectedJob}) => {
     }
   };
 
+  const getMediaDirectory = async () => {
+    const androidVersion = parseInt(DeviceInfo.getSystemVersion(), 10);
+
+    if (androidVersion >= 10) {
+      // Scoped storage enforced, use app-specific external directory
+      return `${RNFS.ExternalDirectoryPath}/media`;
+    } else {
+      // Legacy support (Android 9 and below)
+      const hasPermission = await PermissionsAndroid.check(
+        PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+      );
+      if (!hasPermission) {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+        );
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          throw new Error('Storage permission denied');
+        }
+      }
+      return `${RNFS.ExternalStorageDirectoryPath}/RoofingSolar/media`;
+    }
+  };
+
   const backgroundUploadAndroid = async files => {
     setLoading(true);
     setMessage('Preparing files...');
 
     await requestMultiPermission();
+    console.log(files, 'files');
     const uploadingFiles = [];
     const {access_token} = await getLoginDetails();
 
-    const mediaDir =
-      Platform.OS === 'android'
-        ? `${RNFS.ExternalStorageDirectoryPath}/Android/media/com.roofingsolar/media`
-        : `${RNFS.DocumentDirectoryPath}/media`;
-
+    const mediaDir = await getMediaDirectory();
     const targetExists = await RNFS.exists(mediaDir);
     if (!targetExists) {
       await RNFS.mkdir(mediaDir);
@@ -849,7 +869,12 @@ const PhotosVideoScreen = ({selectedJob}) => {
       const presignedUrls = await getPresignedUrls(file);
       const fileName = file?.name || `upload_${Date.now()}`;
       const destPath = `${mediaDir}/${fileName}`;
-      const selectPath = file?.path ?? file?.originalPath ?? null;
+      const selectPath =
+        file?.path ??
+        file?.originalPath ??
+        (file?.uri?.startsWith('file://')
+          ? file.uri.replace('file://', '')
+          : null);
 
       try {
         if (!selectPath) {
@@ -906,17 +931,6 @@ const PhotosVideoScreen = ({selectedJob}) => {
     });
 
     try {
-      // const veryIntensiveTask = async taskDataArguments => {
-      //   // Example of an infinite loop task
-      //   const {delay} = taskDataArguments;
-      //   await new Promise(async resolve => {
-      //     for (let i = 0; BackgroundService.isRunning(); i++) {
-      //       console.log(i);
-      //       await sleep(delay);
-      //     }
-      //   });
-      // };
-
       const options = {
         taskName: 'Example',
         taskTitle: 'ExampleTask title',
@@ -931,33 +945,24 @@ const PhotosVideoScreen = ({selectedJob}) => {
           delay: 1000,
         },
       };
-
-      // await BackgroundService.start(veryIntensiveTask, options);
-      // await BackgroundService.updateNotification({
-      //   taskDesc: 'New ExampleTask description',
-      // }); // Only Android, iOS will ignore this call
-      // // iOS will also run everything here in the background until .stop() is called
-      // await BackgroundService.stop();
-
       const check = BackgroundService.isRunning();
-      console.log(check, 'check');
-      // await BackgroundService.start(data => {
-      //   setIsUploading(true);
-      //   backgroundUploadTask(
-      //     data,
-      //     progress => setUploadProgress(progress),
-      //     fileName => setCurrentUploadFileName(fileName),
-      //     handleUploadError,
-      //   ).then(() => {
-      //     setIsUploading(false);
-      //     setCurrentUploadFileName('');
-      //   });
-      // }, options);
-      // if (check) {
-      await BackgroundService.start(data => {
+      if (check) {
+        await BackgroundService.start(data => {
+          setIsUploading(true);
+          backgroundUploadTask(
+            data,
+            progress => setUploadProgress(progress),
+            fileName => setCurrentUploadFileName(fileName),
+            handleUploadError,
+          ).then(() => {
+            setIsUploading(false);
+            setCurrentUploadFileName('');
+          });
+        }, options);
+      } else {
         setIsUploading(true);
         backgroundUploadTask(
-          data,
+          {files},
           progress => setUploadProgress(progress),
           fileName => setCurrentUploadFileName(fileName),
           handleUploadError,
@@ -965,19 +970,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
           setIsUploading(false);
           setCurrentUploadFileName('');
         });
-      }, options);
-      // } else {
-      setIsUploading(true);
-      backgroundUploadTask(
-        {files},
-        progress => setUploadProgress(progress),
-        fileName => setCurrentUploadFileName(fileName),
-        handleUploadError,
-      ).then(() => {
-        setIsUploading(false);
-        setCurrentUploadFileName('');
-      });
-      // }
+      }
     } catch (error) {
       console.warn('Background service not available, uploading directly.');
       // Fallback to direct upload
@@ -1414,15 +1407,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
         </TouchableOpacity>
       );
     },
-    [
-      deletingMediaUri,
-      contractorId,
-      openMediaMenu,
-      handleRemoveMedia,
-      setSelectedMedia,
-      setModalVisible,
-      setModalMediaLoading,
-    ],
+    [focusedIndex, contractorId, deletingMediaUri],
   );
 
   const renderDateSection = useCallback(

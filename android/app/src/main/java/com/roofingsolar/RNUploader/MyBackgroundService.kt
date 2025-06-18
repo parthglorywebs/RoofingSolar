@@ -101,6 +101,7 @@ class MyBackgroundService : Service() {
                         updateNotification(
                             title = "Uploading: $fileName",
                             message = "File ${i + 1}/$totalFiles ($fileName)\nProgress: 0%\nUploaded Files: ${uploadedFileCount.get()}, Remaining: $remainingFiles",
+                            progress = 0,
                             ongoing = true
                         )
                     }
@@ -153,8 +154,10 @@ class MyBackgroundService : Service() {
                                         val uploadedCount = uploadedFileCount.get()
                                         val remaining = totalFiles - uploadedCount
                                         updateNotification(
-                                            title = "Uploading: $fileName",
-                                            message = "File ${i + 1}/$totalFiles ($fileName)\nProgress: $progressPercent%\nUploaded Files: $uploadedCount, Remaining: $remaining\nSpeed: ${formatSpeed(averageSpeed)}",
+                                            title = "Uploading: $key - $fileName \n" +
+                                                    "Progress: $progressPercent%",
+                                            message = "File ${i + 1}/$totalFiles ($fileName)\nUploaded Files: $uploadedCount, Remaining: $remaining\nSpeed: ${formatSpeed(averageSpeed)}",
+                                            progress = progressPercent,
                                             ongoing = true
                                         )
                                     }
@@ -188,7 +191,7 @@ class MyBackgroundService : Service() {
 
                         if (!success) {
                             withContext(Dispatchers.Main) {
-                                updateNotification("Upload failed", "Failed to upload $fileName", ongoing = false)
+                                updateNotification("Upload failed", "Failed to upload $fileName", progress = null, ongoing = false)
                             }
                             stopForeground(true)
                             stopSelf()
@@ -221,15 +224,16 @@ class MyBackgroundService : Service() {
 
                     withContext(Dispatchers.Main) {
                         updateNotification(
-                            "Uploaded: $fileName",
-                            "File ${i + 1}/$totalFiles ($fileName) uploaded successfully\nUploaded Files: ${uploadedFileCount.get()}, Remaining: ${totalFiles - uploadedFileCount.get()}",
+                            title = "Uploaded: $fileName",
+                            message = "File ${i + 1}/$totalFiles ($fileName) uploaded successfully\nUploaded Files: ${uploadedFileCount.get()}, Remaining: ${totalFiles - uploadedFileCount.get()}",
+                            progress = null,
                             ongoing = true
                         )
                     }
                 }
 
                 withContext(Dispatchers.Main) {
-                    updateNotification("Upload Complete", "All files uploaded successfully", ongoing = false)
+                    updateNotification("Upload Complete", "All files uploaded successfully", progress = null, ongoing = false)
 
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                         stopForeground(Service.STOP_FOREGROUND_DETACH)
@@ -243,7 +247,7 @@ class MyBackgroundService : Service() {
             } catch (e: Exception) {
                 Log.e(TAG, "❌ Upload error", e)
                 withContext(Dispatchers.Main) {
-                    updateNotification("Upload failed", e.message ?: "Unknown error", ongoing = false)
+                    updateNotification("Upload failed", e.message ?: "Unknown error", progress = null, ongoing = false)
                 }
                 stopForeground(true)
                 stopSelf()
@@ -253,11 +257,25 @@ class MyBackgroundService : Service() {
         return START_STICKY
     }
 
-    private fun updateNotification(title: String, message: String, ongoing: Boolean) {
+    private fun updateNotification(title: String, message: String, progress: Int? = null, ongoing: Boolean) {
         notificationBuilder.setContentTitle(title)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
             .setContentText(message)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
             .setOngoing(ongoing)
+
+        // Change icon based on whether it's still uploading or completed
+        if (ongoing) {
+            notificationBuilder.setSmallIcon(android.R.drawable.stat_sys_upload)
+        } else {
+            notificationBuilder.setSmallIcon(android.R.drawable.stat_sys_upload_done)
+        }
+
+        if (progress != null && progress in 0..100) {
+            notificationBuilder.setProgress(100, progress, false)
+        } else {
+            notificationBuilder.setProgress(0, 0, false)
+        }
+
         notificationManager.notify(NOTIFICATION_ID, notificationBuilder.build())
     }
 

@@ -192,7 +192,20 @@ const BottomTabNavigator = () => {
             <Text style={{color: Colors.white, fontSize: 20}}>Leads</Text>
           ),
         }}
+        listeners={({navigation}) => ({
+          tabPress: e => {
+            // Prevent default behavior if needed
+            // e.preventDefault();
+
+            // Navigate with params
+            navigation.navigate('Leads', {
+              screen: 'LeadsList', // Or your specific screen name inside the LeadStackNavigator
+              params: {clearFilters: true},
+            });
+          },
+        })}
       />
+
       {/* <Tab.Screen
         name="Search"
         component={Messages}

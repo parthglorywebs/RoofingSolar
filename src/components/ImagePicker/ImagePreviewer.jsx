@@ -4,10 +4,11 @@ import ImageViewer from 'react-native-image-zoom-viewer';
 import FastImage from 'react-native-fast-image';
 
 const ImagePreviewer = ({
-  mediaUrl,
   mediaUrls,
   initialIndex,
   setPreviewVisible,
+  onNext,
+  onPrev,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -25,8 +26,6 @@ const ImagePreviewer = ({
 
   // Use FastImage to load and cache the image
   const renderImage = props => {
-    console.log(props.source, 'props.source');
-
     return (
       <FastImage
         style={props.style}
@@ -44,6 +43,15 @@ const ImagePreviewer = ({
     return mediaUrls.map(url => ({url}));
   }, [mediaUrls]);
 
+  const handleImageChange = index => {
+    if (index > currentIndex && onNext) {
+      onNext(index);
+    } else if (index < currentIndex && onPrev) {
+      onPrev(index);
+    }
+    setCurrentIndex(index);
+  };
+
   return (
     <View style={styles.container}>
       <ImageViewer
@@ -58,6 +66,7 @@ const ImagePreviewer = ({
         renderImage={renderImage}
         enablePreload={true}
         enableImageZoom={true}
+        onChange={handleImageChange}
       />
     </View>
   );

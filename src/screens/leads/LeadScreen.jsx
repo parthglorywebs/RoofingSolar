@@ -30,12 +30,12 @@ import {
 import axios from 'axios';
 import config from '../../config/config';
 import {getLoginDetails} from '../../utils/AsyncStorage';
-import {useNavigation} from '@react-navigation/native';
+import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import countries from '../../assets/countries.json';
 import * as Progress from 'react-native-progress';
 import ActionSheet from 'react-native-actions-sheet';
 import FilterActionSheet from '../../components/FilterActionSheet';
-import LoadListing from './component/LoadListing';
+import LoadListing, {LeadSkeletonCard} from './component/LoadListing';
 
 const {height: screenHeight} = Dimensions.get('window');
 const pipelineColorMap = {
@@ -117,6 +117,21 @@ const LeadScreen = ({route}) => {
   const [selectedChip, setSelectedChip] = useState(null);
 
   const flatListRef = useRef(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      setSelectedFilterStage(null);
+      setProjectListData([]);
+      setPagination({
+        current_page: 0,
+        last_page: 1, // Use 1 to trigger the first page
+        per_page: 10,
+        total: 0,
+      });
+      setStageInfo(prev => ({...prev, stage: null}));
+      closeFilterModal();
+    }, [itemData]),
+  );
 
   const loadMoreData = useCallback(async () => {
     // Prevent loading if already on last page
@@ -547,8 +562,34 @@ const LeadScreen = ({route}) => {
     );
   }, []);
 
+  const SkeletonChip = () => (
+    <View
+      style={[
+        styles.propertyChip,
+        {
+          backgroundColor: '#ddd',
+          margin: 8,
+          height: 40,
+          width: '45%',
+          borderRadius: 20,
+        },
+      ]}
+    />
+  );
+
   const renderFooter = () => {
     if (isFetchingMore) {
+      if (projectListData.length === 0) {
+        return (
+          <>
+            {Array(5)
+              .fill(null)
+              .map((_, index) => (
+                <LeadSkeletonCard key={index} />
+              ))}
+          </>
+        );
+      }
       return (
         <View style={styles.loadingMoreContainer}>
           <ActivityIndicator size="small" color={Colors.primary} />
@@ -861,14 +902,14 @@ const LeadScreen = ({route}) => {
           </View>
         </View>
 
-        <FlatList
+        {/* <FlatList
           data={propertyData}
           keyExtractor={item => item.id}
           numColumns={2}
           renderItem={renderItem}
           contentContainerStyle={styles.flatListContainer}
           nestedScrollEnabled={true}
-        />
+        /> */}
 
         <View style={styles.container}>
           <Searchbar
@@ -880,7 +921,11 @@ const LeadScreen = ({route}) => {
         </View>
         {loading && pagination.current_page === 1 ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={Colors.primary} />
+            {Array(5)
+              .fill(null)
+              .map((_, index) => (
+                <LeadSkeletonCard key={index} />
+              ))}
           </View>
         ) : errorList ? (
           <View style={styles.emptyStateContainer}>

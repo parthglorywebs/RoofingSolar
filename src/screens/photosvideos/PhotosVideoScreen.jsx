@@ -18,6 +18,7 @@ import {
   NativeModules,
   NativeEventEmitter,
   AppState,
+  Linking,
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import DeviceInfo from 'react-native-device-info';
@@ -61,10 +62,8 @@ const PhotosVideoScreen = ({selectedJob}) => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [uploading, setUploading] = useState(false);
-  const [projectId, setProjectId] = useState(null);
   const flatListRef = useRef(null);
   const [contractorId, setContractorId] = useState(null);
-  const [uploadStatus, setUploadStatus] = useState(null);
   const [deletingMediaUri, setDeletingMediaUri] = useState(null);
   const [modalMediaLoading, setModalMediaLoading] = useState(false);
   const [notes, setNotes] = useState('');
@@ -88,6 +87,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
   const [page, setPage] = useState(1); // Current page number
   const [totalPages, setTotalPages] = useState(1); // Total number of pages
   const [isFetchingMore, setIsFetchingMore] = useState(false); // Loading state for pagination
+  const [isLoading, setIsLoading] = useState(false);
   const [apiLoading, setApiLoading] = useState(true);
   const [initialLoad, setInitialLoad] = useState(true); // Track the initial data fetch
   const [uploadingStatus, setUploadingStatus] = useState({
@@ -108,58 +108,68 @@ const PhotosVideoScreen = ({selectedJob}) => {
     setInitialLoad(false); // Initial load is complete
   }, []);
 
-  const getMediaList = async rawItems => {
-    const mediaList = await Promise.all(
-      rawItems.flatMap(({is_date, is_item}) =>
-        is_item.map(async item => {
-          if (item.media_type === 'video') {
-            const thumb_video_image = await getImageUrlByType(
-              item.project_image,
-              'thumb_video_image',
-            );
-            const videoUrl = await getImageUrlByType(
-              item.project_image,
-              'video',
-            );
+  const requestMultiPermission = async () => {
+    if (Platform.OS !== 'android') return true;
 
-            return {
-              ...item,
-              is_date,
-              url: videoUrl,
-              galleryUrl: thumb_video_image,
-              type: item.media_type,
-              notes: item.notes,
-              createdAt: item.created_at,
-              username: item.created_by,
-            };
-          } else {
-            const thumbUrl = await getImageUrlByType(
-              item.project_image,
-              'thumbnail',
-            );
-            const galleryUrl = await getImageUrlByType(
-              item.project_image,
-              'gallery',
-            );
+    // Check Android version
+    const androidVersion = Platform.Version;
 
-            return {
-              ...item,
-              is_date,
-              url: thumbUrl,
-              galleryUrl: galleryUrl,
-              type: item.media_type,
-              notes: item.notes,
-              createdAt: item.created_at,
-              username: item.created_by,
-            };
-          }
-        }),
-      ),
-    );
+    // Filter permissions based on version
+    const permissions = [
+      PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+      PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION,
+    ];
 
-    return mediaList;
+    // Only add storage permissions if Android version < 30 (Android 11)
+    if (androidVersion < 30) {
+      permissions.push(
+        PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+        PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
+      );
+    }
+
+    const getReadableName = key => {
+      switch (key) {
+        case PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS:
+          return 'Post Notifications';
+        case PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION:
+          return 'Background Location';
+        case PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE:
+          return 'Write External Storage';
+        case PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE:
+          return 'Read External Storage';
+        default:
+          return key;
+      }
+    };
+
+    const deniedList = [];
+
+    for (const permission of permissions) {
+      const status = await PermissionsAndroid.request(permission);
+      console.log(`Permission for ${permission}:`, status);
+
+      if (status !== PermissionsAndroid.RESULTS.GRANTED) {
+        deniedList.push(getReadableName(permission));
+      }
+    }
+
+    if (deniedList.length > 0) {
+      Alert.alert(
+        'Permission Required',
+        `The following permissions are not allowed: ${deniedList.join(
+          ', ',
+        )}. Please allow them from Settings.`,
+        [
+          {text: 'Cancel', style: 'cancel'},
+          {text: 'Open Settings', onPress: () => Linking.openSettings()},
+        ],
+      );
+      return false;
+    }
+
+    return true;
   };
-
   const preloadInChunks = (images, chunkSize = 10) => {
     for (let i = 0; i < images.length; i += chunkSize) {
       const chunk = images.slice(i, i + chunkSize);
@@ -169,6 +179,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
 
   const onRefresh = useCallback(
     async (currentPage = 1, fromDate = null, toDate = null) => {
+      setIsLoading(true);
       if (currentPage === 1) {
         setApiLoading(true); // Initial load
       } else {
@@ -256,201 +267,19 @@ const PhotosVideoScreen = ({selectedJob}) => {
 
         setTotalPages(sources.data.last_page);
         setPage(currentPage);
+        setApiLoading(false);
+        setIsFetchingMore(false);
+        setIsLoading(false);
       } catch (error) {
         console.error('Error loading media:', error);
       } finally {
         setApiLoading(false);
         setIsFetchingMore(false);
+        setIsLoading(false);
       }
     },
     [selectedJob],
   );
-
-  const requestPermission = async () => {
-    if (Platform.OS === 'android') {
-      const permissions = [
-        PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
-        PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION,
-      ];
-
-      const granted = await PermissionsAndroid.requestMultiple(permissions);
-      console.log(granted);
-
-      return Object.values(granted).every(
-        status => status === PermissionsAndroid.RESULTS.GRANTED,
-      );
-    }
-    return true;
-  };
-
-  // const fetchPhotoVideos = useCallback(
-  //   async (currentPage = 1, fromDate = null, toDate = null) => {
-  //     // Added currentPage parameter with default value
-  //     if (currentPage === 1) {
-  //       setApiLoading(true); // Only show full loader on initial load
-  //     } else {
-  //       setIsFetchingMore(true); // Show pagination loader
-  //     }
-
-  //     try {
-  //       const {access_token, contractor_id} = await getLoginDetails();
-  //       let apiUrl = `${config.baseUrl}contractor/get-photos-videos`;
-  //       let postData = {
-  //         contractor_id: contractor_id,
-  //         project_id: selectedJob.id,
-  //         page: currentPage, // Use the currentPage parameter
-  //       };
-
-  //       // if (fromDate && toDate) {
-  //       //   apiUrl = `${config.baseUrl}contractor/date-filter-photos-videos`;
-  //       //   postData = {
-  //       //     contractor_id: contractor_id,
-  //       //     project_id: selectedJob.id,
-  //       //     fromdate: moment(fromDate).format('MM/DD/YYYY'),
-  //       //     todate: moment(toDate).format('MM/DD/YYYY'),
-  //       //     page: currentPage, // Include page for date-filtered requests as well
-  //       //   };
-  //       // }
-
-  //       const response = await axios.post(apiUrl, postData, {
-  //         headers: {
-  //           'Content-Type': 'application/x-www-form-urlencoded',
-  //           Authorization: `Bearer ${access_token}`,
-  //         },
-  //         transformResponse: data => {
-  //           try {
-  //             return JSON.parse(data);
-  //           } catch (e) {
-  //             return data;
-  //           }
-  //         },
-  //       });
-
-  //       if (response.status !== 200) {
-  //         // Check for 422 status specifically
-  //         if (response.status === 422) {
-  //           setGroupedMedia({}); // Clear any existing data
-  //           console.log(
-  //             'No Photos and videos found for the selected date range',
-  //           );
-  //           // Optionally, show a user-friendly message (not an Alert, just a text in the UI)
-  //           return; // Exit the function early
-  //         } else {
-  //           throw new Error('Request failed with status ' + response.status); //Handle other errors
-  //         }
-  //       }
-
-  //       const data = response.data;
-  //       const rawItems = data?.data?.data ?? [];
-  //       const mediaList = await getMediaList(rawItems);
-
-  //       const allRecords = (data?.data?.data ?? []).flatMap(a => a.is_item);
-  //       const medial = mediaList;
-  //       console.log(allRecords, medial.length, 'mediaList');
-
-  //       setVideoImageListing(mediaList);
-  //       setTotalPages(data.data.last_page); // Set total pages from response
-  //       if (currentPage === 1) {
-  //         setPage(currentPage); // Update current page state
-  //       }
-
-  //       // const itemData = (data?.data?.data ?? []).map(item => {
-  //       //   return {
-  //       //     id: '4',
-  //       //     url: 'https://samplelib.com/lib/preview/mp4/sample-5s.mp4',
-  //       //     type: 'video',
-  //       //     createdAt: '2025-05-29T11:15:00Z',
-  //       //   };
-  //       // });
-
-  //       // if (
-  //       //   data &&
-  //       //   data.success === false &&
-  //       //   data.message === 'Photos & Videos not found.'
-  //       // ) {
-  //       //   setGroupedMedia({});
-  //       //   // console.log('No Photos and videos found');
-  //       // } else if (data && data.data) {
-  //       //   const grouped = data.data.data.reduce((acc, dayData) => {
-  //       //     const dayItems = dayData.is_item
-  //       //       .map(item => {
-  //       //         const thumbUrl = getImageUrlByType(
-  //       //           item.project_image,
-  //       //           'thumbnail',
-  //       //         );
-  //       //         const galleryUrl = getImageUrlByType(
-  //       //           item.project_image,
-  //       //           'gallery',
-  //       //         );
-
-  //       //         if (!thumbUrl || !galleryUrl) return null;
-
-  //       //         return {
-  //       //           uri: thumbUrl,
-  //       //           galleryUrl: galleryUrl,
-  //       //           type: item.media_type,
-  //       //           notes: item.notes,
-  //       //           postedTime: item.created_at,
-  //       //           date: dayData.is_date,
-  //       //           mediaId: item.id,
-  //       //           created_by: item.created_by,
-  //       //         };
-  //       //       })
-  //       //       .filter(Boolean); // Removes any null items
-
-  //       //     if (dayItems.length > 0) {
-  //       //       if (!acc[dayData.is_date]) {
-  //       //         acc[dayData.is_date] = [];
-  //       //       }
-  //       //       acc[dayData.is_date].push(...dayItems);
-  //       //     }
-
-  //       //     return acc;
-  //       //   }, {});
-
-  //       //   if (currentPage === 1) {
-  //       //     // Initial data load, replace existing data
-  //       //     setGroupedMedia(grouped);
-  //       //   } else {
-  //       //     // Append new data to existing data
-  //       //     setGroupedMedia(prevGroupedMedia => {
-  //       //       const newGroupedMedia = {...prevGroupedMedia};
-  //       //       for (const date in grouped) {
-  //       //         if (newGroupedMedia[date]) {
-  //       //           // If date already exists, append the items
-  //       //           newGroupedMedia[date] = [
-  //       //             ...newGroupedMedia[date],
-  //       //             ...grouped[date],
-  //       //           ];
-  //       //         } else {
-  //       //           // If date doesn't exist, add the new date and items
-  //       //           newGroupedMedia[date] = grouped[date];
-  //       //         }
-  //       //       }
-  //       //       return newGroupedMedia;
-  //       //     });
-  //       //   }
-
-  //       //   setTotalPages(data.data.last_page); // Set total pages from response
-  //       //   setPage(currentPage); // Update current page state
-  //       // } else {
-  //       //   console.error('Invalid data format received from API:', data);
-  //       //   Alert.alert(
-  //       //     'Error',
-  //       //     'Failed to load media files. Invalid data format.',
-  //       //   );
-  //       // }
-  //     } catch (error) {
-  //       console.error('Error fetching photos/videos:', error);
-  //       // Alert.alert('Error', 'Failed to load photos and videos.');
-  //     } finally {
-  //       setApiLoading(false);
-  //       setIsFetchingMore(false); // End pagination loading
-  //     }
-  //   },
-  //   [selectedJob],
-  // );
-
   const sleep = time => new Promise(resolve => setTimeout(resolve, time));
 
   const backgroundUploadTask = async (
@@ -467,7 +296,7 @@ const PhotosVideoScreen = ({selectedJob}) => {
 
     try {
       // 1. Request notification permission (Android 13+)
-      await requestPermission();
+      await requestMultiPermission();
 
       // 2. Create notification channel (no sound/vibration)
       PushNotification.createChannel(
@@ -794,25 +623,6 @@ const PhotosVideoScreen = ({selectedJob}) => {
     }
   };
 
-  const requestMultiPermission = async () => {
-    if (Platform.OS === 'android') {
-      const permissions = [
-        PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
-        PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION,
-        PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
-        PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
-      ];
-
-      const granted = await PermissionsAndroid.requestMultiple(permissions);
-      console.log(granted);
-
-      return Object.values(granted).every(
-        status => status === PermissionsAndroid.RESULTS.GRANTED,
-      );
-    }
-    return true;
-  };
-
   const requestBackgroundPermission = async fileList => {
     try {
       const check = await await MyServiceModule.startBackgroundService(
@@ -849,10 +659,13 @@ const PhotosVideoScreen = ({selectedJob}) => {
   };
 
   const backgroundUploadAndroid = async files => {
+    const checkPermission = await requestMultiPermission();
+    if (!checkPermission) {
+      Alert.alert('Permission Denied', 'Uploading File Permission has denied!');
+      return false;
+    }
     setLoading(true);
     setMessage('Preparing files...');
-
-    await requestMultiPermission();
     console.log(files, 'files');
     const uploadingFiles = [];
     const {access_token} = await getLoginDetails();
@@ -1765,6 +1578,17 @@ const PhotosVideoScreen = ({selectedJob}) => {
     );
   }, []);
 
+  const handleUpdate = (index, updatedPayload) => {
+    setVideoImageListing(prevList => {
+      const newList = [...prevList];
+      newList[index] = {
+        ...newList[index],
+        ...updatedPayload, // Only update changed fields
+      };
+      return newList;
+    });
+  };
+
   return (
     <View style={styles.container}>
       {uploadingStatus.inProgress && (
@@ -1800,13 +1624,17 @@ const PhotosVideoScreen = ({selectedJob}) => {
       <MediaGallery
         mediaList={videoImageListing}
         onLoadMore={handleLoadMore}
-        isLoadingMore={apiLoading}
+        isLoadingMore={isFetchingMore}
+        isLoading={isLoading}
         totalPages={totalPages}
         currentPage={page}
         selectedJob={selectedJob}
         handleSetAsCoverPhoto={handleSetAsCoverPhoto}
         onDelete={onDelete}
         onRefresh={pageNumber => onRefresh(pageNumber ?? page)}
+        onUpdate={(index, updatedPayload) =>
+          handleUpdate(index, updatedPayload)
+        }
       />
 
       <View style={styles.topRightContainer}>

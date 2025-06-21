@@ -258,9 +258,9 @@ const ImageVideoEditor = ({
 
   return (
     <View>
-      <TouchableOpacity onPress={openEditor} activeOpacity={0.2}>
+      <View>
         {children ?? <Text style={styles.buttonText}>Edit {media_type}</Text>}
-      </TouchableOpacity>
+      </View>
 
       {loading && (
         <View style={styles.loadingOverlay}>

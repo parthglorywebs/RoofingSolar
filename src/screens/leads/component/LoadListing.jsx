@@ -13,6 +13,42 @@ const pipelineColorMap = {
   closed: '#F9F1F0',
 };
 
+export const LeadSkeletonCard = () => (
+  <View style={[styles.card, {opacity: 0.6}]}>
+    <Card.Title
+      title=""
+      left={() => (
+        <Avatar.Text label=" " size={40} style={{backgroundColor: '#e0e0e0'}} />
+      )}
+      titleStyle={{backgroundColor: '#e0e0e0', height: 20, borderRadius: 4}}
+      right={() => (
+        <MaterialCommunityIcons
+          name="chevron-right"
+          size={24}
+          color="#ccc"
+          style={styles.chevron}
+        />
+      )}
+    />
+    <Card.Content>
+      <View style={styles.row}>
+        <View style={[styles.skeletonBox, {width: 80, height: 14}]} />
+        <View
+          style={[styles.skeletonBox, {width: 120, height: 14, marginLeft: 8}]}
+        />
+      </View>
+      <View style={[styles.row, {marginTop: 8}]}>
+        <View style={[styles.skeletonBox, {width: 200, height: 14}]} />
+      </View>
+      <Divider style={{marginVertical: 8}} />
+      <View style={styles.rowBetween}>
+        <View style={[styles.skeletonBox, {width: 100, height: 16}]} />
+        <View style={[styles.skeletonBox, {width: 40, height: 16}]} />
+      </View>
+    </Card.Content>
+  </View>
+);
+
 const LoadCard = ({item, onPress}) => {
   const isPaid = item.balancedue?.balanceDue === '0.00';
   const totalAmount = item?.balancedue?.totalAmount;
@@ -128,14 +164,20 @@ const LoadListing = ({data, itemData}) => {
   );
   return (
     <View style={{marginTop: 15}}>
-      <FlatList
-        data={data}
-        keyExtractor={item => item.id.toString()}
-        contentContainerStyle={styles.container}
-        renderItem={({item}) => (
-          <LoadCard item={item} onPress={handlePropertyDetail} />
-        )}
-      />
+      {data.length === 0 ? (
+        Array(5)
+          .fill(null)
+          .map((_, index) => <LeadSkeletonCard key={index} />)
+      ) : (
+        <FlatList
+          data={data}
+          keyExtractor={item => item.id.toString()}
+          contentContainerStyle={styles.container}
+          renderItem={({item}) => (
+            <LoadCard item={item} onPress={handlePropertyDetail} />
+          )}
+        />
+      )}
     </View>
   );
 };
@@ -194,6 +236,10 @@ const styles = StyleSheet.create({
   chevron: {
     marginRight: 12,
     alignSelf: 'center',
+  },
+  skeletonBox: {
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
   },
 });
 

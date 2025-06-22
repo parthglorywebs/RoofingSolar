@@ -107,9 +107,17 @@ android {
     }
 }
 
+apply from: file("../../node_modules/react-native-vector-icons/fonts.gradle")
+
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
+    implementation project(':react-native-vector-icons')
+    implementation project(':react-native-file-viewer')
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation "androidx.work:work-runtime-ktx:2.8.1"
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation "com.google.guava:guava:31.1-android"
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
